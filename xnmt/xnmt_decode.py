@@ -23,6 +23,7 @@ options = [
   Option("dynet-gpus", int, required=False),
   Option("model_file", force_flag=True, required=True, help_str="pretrained (saved) model path"),
   Option("src_file", help_str="path of input src file to be translated"),
+  Option("mt_file", default_value="",  help_str="path of input mt file to be translated"),
   Option("trg_file", help_str="path of file where expected trg translatons will be written"),
   Option("max_src_len", int, required=False, help_str="Remove sentences from data to decode that are longer than this on the source side"),
   Option("input_format", default_value="text", help_str="format of input data: text/contvec"),
@@ -58,13 +59,19 @@ def xnmt_decode(args, model_elements=None):
 #
   else:
     corpus_parser, generator = model_elements
-
+  trilingual = args.mt_file
+  if trilingual:
+    assert hasattr(corpus_parser, 'mt_reader')
   is_reporting = issubclass(generator.__class__, Reportable) and args.report_path is not None
   # Corpus
   src_corpus = corpus_parser.src_reader.read_sents(args.src_file)
+  if trilingual:
+    mt_corpus = corpus_parser.mt_reader.read_sents(args.mt_file)
   # Vocab
   src_vocab = corpus_parser.src_reader.vocab if hasattr(corpus_parser.src_reader, "vocab") else None
   trg_vocab = corpus_parser.trg_reader.vocab if hasattr(corpus_parser.trg_reader, "vocab") else None
+  if trilingual:
+    mt_vocab = corpus_parser.mt_reader.vocab if hasattr(corpus_parser.mt_reader, "vocab") else None
   # Perform initialization
   generator.set_train(False)
   generator.initialize_generator(**args.params_as_dict)
@@ -73,22 +80,39 @@ def xnmt_decode(args, model_elements=None):
     generator.set_post_processor(output_processor_for_spec(args.post_process))
     generator.set_trg_vocab(trg_vocab)
     generator.set_reporting_src_vocab(src_vocab)
+    if trilingual:
+      generator.set_reporting_mt_vocab(mt_vocab)
 
   if is_reporting:
     generator.set_report_resource("src_vocab", src_vocab)
     generator.set_report_resource("trg_vocab", trg_vocab)
+    if trilingual:
+      generator.set_report_resource("mt_vocab", mt_vocab)
 
   # Perform generation of output
   with io.open(args.trg_file, 'wt', encoding='utf-8') as fp:  # Saving the translated output to a trg file
-    for i, src in enumerate(src_corpus):
-      # Do the decoding
-      if args.max_src_len is not None and len(src) > args.max_src_len:
-        outputs = NO_DECODING_ATTEMPTED
-      else:
-        dy.renew_cg()
-        outputs = generator.generate_output(src, i)
-      # Printing to trg file
-      fp.write(u"{}\n".format(outputs))
+    if trilingual:
+      i = 0
+      for mt, src in zip(mt_corpus, src_corpus):
+        # Do the decoding
+        if args.max_src_len is not None and len(src) > args.max_src_len:
+          outputs = NO_DECODING_ATTEMPTED
+        else:
+          dy.renew_cg()
+          outputs = generator.generate_output(mt, src, i)
+        # Printing to trg file
+        fp.write(u"{}\n".format(outputs))
+        i += 1
+    else:
+      for i, src in enumerate(src_corpus):
+        # Do the decoding
+        if args.max_src_len is not None and len(src) > args.max_src_len:
+          outputs = NO_DECODING_ATTEMPTED
+        else:
+          dy.renew_cg()
+          outputs = generator.generate_output(src, i)
+        # Printing to trg file
+        fp.write(u"{}\n".format(outputs))
 
 def output_processor_for_spec(spec):
   if spec == "none":

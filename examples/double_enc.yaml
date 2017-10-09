@@ -133,6 +133,7 @@ defaults:
           dec_layers: 1
           enc_dim: 1024
   decode:
+    mt_file: examples/output/test.norm.en
     src_file: examples/output/test.norm.ja
   evaluate:
     ref_file: examples/output/test.norm.en

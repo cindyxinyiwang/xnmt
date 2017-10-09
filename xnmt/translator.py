@@ -18,6 +18,7 @@ from xnmt.decorators import recursive_assign, recursive
 import xnmt.serializer
 import xnmt.evaluator
 from xnmt.batcher import mark_as_batch, is_batched
+from xnmt.encoder_state import FinalEncoderState
 
 # Reporting purposes
 from lxml import etree
@@ -47,6 +48,187 @@ class Translator(GeneratorModel):
 
   def set_post_processor(self, post_processor):
     self.post_processor = post_processor
+
+class DoubleEncTranslator(Translator, Serializable, Reportable):
+  '''
+  A default translator based on attentional sequence-to-sequence models.
+  '''
+
+  yaml_tag = u'!DoubleEncTranslator'
+
+  def __init__(self, mt_embedder, src_embedder, mt_encoder, src_encoder, attender, trg_embedder, decoder, loss_calculator=None):
+    '''Constructor.
+
+    :param src_embedder: A word embedder for the input language
+    :param encoder: An encoder to generate encoded inputs
+    :param attender: An attention module
+    :param trg_embedder: A word embedder for the output language
+    :param decoder: A decoder
+    '''
+    self.mt_embedder = mt_embedder
+    self.src_embedder = src_embedder
+    self.mt_encoder = mt_encoder
+    self.src_encoder = src_encoder
+    self.attender = attender
+    self.trg_embedder = trg_embedder
+    self.decoder = decoder
+
+    if loss_calculator is None:
+      self.loss_calculator = TranslatorMLELoss()
+    else:
+      self.loss_calculator = loss_calculator
+
+    self.register_hier_child(self.mt_encoder)
+    self.register_hier_child(self.src_encoder)
+    self.register_hier_child(self.decoder)
+    self.register_hier_child(self.mt_embedder)
+    self.register_hier_child(self.src_embedder)
+    self.register_hier_child(self.trg_embedder)
+
+  def shared_params(self):
+    return [set(["src_embedder.emb_dim", "src_encoder.input_dim"]),
+            set(["mt_embedder.emb_dim", "mt_encoder.input_dim"]),
+            set(["mt_encoder.hidden_dim", "src_encoder.hidden_dim", "attender.input_dim"]),
+            set(["attender.state_dim", "decoder.lstm_dim"]),
+            set(["trg_embedder.emb_dim", "decoder.trg_embed_dim"])]
+
+  def dependent_init_params(self):
+    return [DependentInitParam(param_descr="mt_embedder.vocab_size", value_fct=lambda: self.context.corpus_parser.mt_reader.vocab_size()),
+            DependentInitParam(param_descr="src_embedder.vocab_size", value_fct=lambda: self.context.corpus_parser.src_reader.vocab_size()),
+            DependentInitParam(param_descr="decoder.vocab_size", value_fct=lambda: self.context.corpus_parser.trg_reader.vocab_size()),
+            DependentInitParam(param_descr="trg_embedder.vocab_size", value_fct=lambda: self.context.corpus_parser.trg_reader.vocab_size())]
+
+  def initialize_generator(self, **kwargs):
+    if kwargs.get("len_norm_type", None) is None:
+      len_norm = xnmt.length_normalization.NoNormalization()
+    else:
+      len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
+    search_args = {}
+    if kwargs.get("max_len", None) is not None: search_args["max_len"] = kwargs["max_len"]
+    if kwargs.get("beam", None) is None:
+      self.search_strategy = GreedySearch(**search_args)
+    else:
+      search_args["beam_size"] = kwargs.get("beam", 1)
+      search_args["len_norm"] = len_norm
+      self.search_strategy = BeamSearch(**search_args)
+    self.report_path = kwargs.get("report_path", None)
+    self.report_type = kwargs.get("report_type", None)
+
+  def calc_loss(self, mt, src, trg):
+    """
+    :param src: source sequence (unbatched, or batched + padded)
+    :param trg: target sequence (unbatched, or batched + padded); losses will be accumulated only if trg_mask[batch,pos]==0, or no mask is set
+    :returns: (possibly batched) loss expression
+    """
+    self.start_sent()
+    mt_embeddings = self.mt_embedder.embed_sent(mt)
+    src_embeddings = self.src_embedder.embed_sent(src)
+    mt_encodings = self.mt_encoder.transduce(mt_embeddings)
+    src_encodings = self.src_encoder.transduce(src_embeddings)
+    self.attender.init_sent(mt_encodings, src_encodings)
+    # Initialize the hidden state from the encoder
+    ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
+    decoder_init = []
+    for mt_init, src_init in zip(self.mt_encoder.get_final_states(), self.src_encoder.get_final_states()):
+      decoder_init.append(FinalEncoderState(dy.concatenate([mt_init.main_expr(), src_init.main_expr()])) )
+
+    self.decoder.initialize(decoder_init, self.trg_embedder.embed(ss))
+    return self.loss_calculator(self, src, trg)
+
+  def generate(self, mt, src, idx, mt_mask=None, src_mask=None, forced_trg_ids=None):
+    if not xnmt.batcher.is_batched(src):
+      src = xnmt.batcher.mark_as_batch([src])
+    else:
+      assert src_mask is not None
+    outputs = []
+    for sents in src:
+      self.start_sent()
+      src_embeddings = self.src_embedder.embed_sent(src)
+      src_encodings = self.src_encoder.transduce(src_embeddings)
+      mt_embeddings = self.mt_embedder.embed_sent(mt)
+      mt_encodings = self.mt_encoder.transduce(mt_embeddings)
+      self.attender.init_sent(mt_encodings, src_encodings)
+      ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
+      decoder_init = []
+      for mt_init, src_init in zip(self.mt_encoder.get_final_states(), self.src_encoder.get_final_states()):
+        decoder_init.append(FinalEncoderState(dy.concatenate([mt_init.main_expr(), src_init.main_expr()])) )
+      self.decoder.initialize(decoder_init, self.trg_embedder.embed(ss))
+      output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, src_length=len(sents), forced_trg_ids=forced_trg_ids)
+      # In case of reporting
+      if self.report_path is not None:
+        src_words = [self.reporting_src_vocab[w] for w in sents]
+        trg_words = [self.trg_vocab[w] for w in output_actions[1:]]
+        attentions = self.attender.attention_vecs
+        self.set_report_input(idx, src_words, trg_words, attentions)
+        self.set_report_resource("src_words", src_words)
+        self.set_report_path('{}.{}'.format(self.report_path, str(idx)))
+        self.generate_report(self.report_type)
+      # Append output to the outputs
+      if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
+        outputs.append(TextOutput(output_actions, self.trg_vocab))
+      else:
+        outputs.append((output_actions, score))
+    return outputs
+
+  def set_reporting_src_vocab(self, src_vocab):
+    """
+    Sets source vocab for reporting purposes.
+    """
+    self.reporting_src_vocab = src_vocab
+
+  def set_reporting_mt_vocab(self, mt_vocab):
+    """
+    Sets source vocab for reporting purposes.
+    """
+    self.reporting_mt_vocab = mt_vocab
+
+  @recursive_assign
+  def html_report(self, context=None):
+    assert(context is None)
+    idx, src, trg, att = self.get_report_input()
+    path_to_report = self.get_report_path()
+    html = etree.Element('html')
+    head = etree.SubElement(html, 'head')
+    title = etree.SubElement(head, 'title')
+    body = etree.SubElement(html, 'body')
+    report = etree.SubElement(body, 'h1')
+    if idx is not None:
+      title.text = report.text = 'Translation Report for Sentence %d' % (idx)
+    else:
+      title.text = report.text = 'Translation Report'
+    main_content = etree.SubElement(body, 'div', name='main_content')
+
+    # Generating main content
+    captions = [u"Source Words", u"Target Words"]
+    inputs = [src, trg]
+    for caption, inp in six.moves.zip(captions, inputs):
+      if inp is None: continue
+      sent = ' '.join(inp)
+      p = etree.SubElement(main_content, 'p')
+      p.text = u"{}: {}".format(caption, sent)
+
+    # Generating attention
+    if not any([src is None, trg is None, att is None]):
+      attention = etree.SubElement(main_content, 'p')
+      att_text = etree.SubElement(attention, 'b')
+      att_text.text = "Attention:"
+      etree.SubElement(attention, 'br')
+      attention_file = u"{}.attention.png".format(path_to_report)
+
+      if type(att) == dy.Expression:
+        attentions = att.npvalue()
+      elif type(att) == list:
+        attentions = np.concatenate([x.npvalue() for x in att], axis=1)
+      elif type(att) != np.ndarray:
+        raise RuntimeError("Illegal type for attentions in translator report: {}".format(type(attentions)))
+      plot.plot_attention(src, trg, attentions, file_name = attention_file)
+
+    # return the parent context to be used as child context
+    return html
+
+  @recursive
+  def file_report(self):
+    pass
 
 class DefaultTranslator(Translator, Serializable, Reportable):
   '''
@@ -230,6 +412,7 @@ class TranslatorMLELoss(Serializable):
         translator.decoder.add_input(translator.trg_embedder.embed(ref_word))
 
     return dy.esum(losses)
+
 
 class TranslatorReinforceLoss(Serializable):
   yaml_tag = '!TranslatorReinforceLoss'

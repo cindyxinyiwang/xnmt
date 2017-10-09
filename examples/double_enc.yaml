@@ -91,24 +91,35 @@ defaults:
     learning_rate: 0.0002
     lr_decay: 0.5
     dev_metrics: bleu
-    training_corpus: !BilingualTrainingCorpus
+    batch_size: 32
+    trilingual: True
+    training_corpus: !TrilingualTrainingCorpus
+      train_mt: examples/output/train.norm.en
       train_src: examples/output/train.norm.ja
       train_trg: examples/output/train.norm.en
+      dev_mt: examples/output/dev.norm.en
       dev_src: examples/output/dev.norm.ja
       dev_trg: examples/output/dev.norm.en
-    corpus_parser: !BilingualCorpusParser
+    corpus_parser: !TrilingualCorpusParser
+      mt_reader: !PlainTextReader
+        vocab: !Vocab
+          vocab_file: examples/output/train.vocab.en
       src_reader: !PlainTextReader
         vocab: !Vocab
           vocab_file: examples/output/train.vocab.ja
       trg_reader: !PlainTextReader
         vocab: !Vocab
           vocab_file: examples/output/train.vocab.en
-    model: !DefaultTranslator
+    model: !DoubleEncTranslator
+      mt_embedder: !SimpleWordEmbedder
+        emb_dim: 512
       src_embedder: !SimpleWordEmbedder
         emb_dim: 512
-      encoder: !LSTMEncoder
+      mt_encoder: !LSTMEncoder
         layers: 1
-      attender: !StandardAttender
+      src_encoder: !LSTMEncoder
+        layers: 1
+      attender: !DoubleAttender
         hidden_dim: 512
         state_dim: 512
         input_dim: 512
@@ -116,13 +127,16 @@ defaults:
         emb_dim: 512
       decoder: !MlpSoftmaxDecoder
         layers: 1
+        input_dim: 1024
         mlp_hidden_dim: 512
-        bridge: !NoBridge {}
+        bridge: !LinearBridge
+          dec_layers: 1
+          enc_dim: 1024
   decode:
     src_file: examples/output/test.norm.ja
   evaluate:
     ref_file: examples/output/test.norm.en
 
-standard-preproc:
+double-preproc:
   train:
     dropout: 0.1

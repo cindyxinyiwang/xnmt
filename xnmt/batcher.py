@@ -78,6 +78,56 @@ class Batcher(object):
     trg_ret.append(Batch(trg_id, trg_mask))
 
   def pack_by_order(self, src, trg, order):
+    trilingual = False
+    if len(src) == 2 and type(src[0]) == list:
+      trilingual = True
+      
+    src_ret, src_curr = [], []
+    trg_ret, trg_curr = [], []
+    if trilingual:
+      mt_ret, mt_curr = [], []
+    if self.granularity == 'sent':
+      for x in six.moves.range(0, len(order), self.batch_size):
+        if trilingual:
+          self.add_single_batch_double([src[0][y] for y in order[x:x+self.batch_size]], [src[1][y] for y in order[x:x+self.batch_size]], [trg[y] for y in order[x:x+self.batch_size]], mt_ret, src_ret, trg_ret)
+        else:
+          self.add_single_batch([src[y] for y in order[x:x+self.batch_size]], [trg[y] for y in order[x:x+self.batch_size]], src_ret, trg_ret)
+    elif self.granularity == 'word':
+      my_size = 0
+      for i in order:
+        my_size += len_or_zero(src[i]) + len_or_zero(trg[i])
+        if my_size > self.batch_size:
+          if trilingual:
+            self.add_single_batch_double(mt_curr, src_curr, trg_curr, mt_ret, src_ret, trg_ret)
+          else:
+            self.add_single_batch(src_curr, trg_curr, src_ret, trg_ret)
+          my_size = len(src[i]) + len(trg[i])
+          src_curr = []
+          trg_curr = []
+        src_curr.append(src[i])
+        trg_curr.append(trg[i])
+      self.add_single_batch(src_curr, trg_curr, src_ret, trg_ret)
+    else:
+      raise RuntimeError("Illegal granularity specification {}".format(self.granularity))
+    #print(trilingual)
+    #print(order)
+    #print(len(mt_ret))
+    #print(len(trg_ret))
+    #print(len(src_ret))
+    if trilingual:
+      return mt_ret, src_ret, trg_ret
+    else:
+      return src_ret, trg_ret
+
+  def add_single_batch_double(self, mt_curr, src_curr, trg_curr, mt_ret, src_ret, trg_ret):
+    mt_id, mt_mask = pad(mt_curr, pad_token=self.src_pad_token)
+    mt_ret.append(Batch(mt_id, mt_mask))
+    src_id, src_mask = pad(src_curr, pad_token=self.src_pad_token)
+    src_ret.append(Batch(src_id, src_mask))
+    trg_id, trg_mask = pad(trg_curr, pad_token=self.trg_pad_token)
+    trg_ret.append(Batch(trg_id, trg_mask))
+
+  def pack_by_order_double(self, mt, src, trg, order):
     src_ret, src_curr = [], []
     trg_ret, trg_curr = [], []
     if self.granularity == 'sent':
@@ -133,7 +183,13 @@ class SortBatcher(Batcher):
     self.sort_key = sort_key
 
   def pack(self, src, trg):
-    order = np.argsort([self.sort_key(x) for x in six.moves.zip(src,trg)])
+    trilingual = False
+    if len(src) == 2 and type(src[0]) == list:
+      trilingual = True
+    if trilingual:
+      order = np.argsort([self.sort_key(x) for x in six.moves.zip(src[0],trg)])
+    else:
+      order = np.argsort([self.sort_key(x) for x in six.moves.zip(src,trg)])
     return self.pack_by_order(src, trg, order)
 
 # Module level functions

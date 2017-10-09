@@ -14,3 +14,19 @@ class BilingualTrainingCorpus(Serializable):
     self.dev_trg = dev_trg
     self.dev_id_file = dev_id_file
 
+
+class TrilingualTrainingCorpus(Serializable):
+  """
+  A structure containing training and development sets for bilingual training
+  """
+
+  yaml_tag = "!TrilingualTrainingCorpus"
+  def __init__(self, train_mt, train_src, train_trg, dev_mt, dev_src, dev_trg, train_id_file=None, dev_id_file=None):
+    self.train_mt = train_mt
+    self.train_src = train_src
+    self.train_trg = train_trg
+    self.train_id_file = train_id_file
+    self.dev_mt = dev_mt
+    self.dev_src = dev_src
+    self.dev_trg = dev_trg
+    self.dev_id_file = dev_id_file

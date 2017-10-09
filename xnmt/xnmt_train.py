@@ -62,6 +62,7 @@ options = [
   Option("reload_command", default_value=None, required=False, help_str="Command to change the input data after each epoch. "
                                                                         "--epoch EPOCH_NUM will be appended to the command."
                                                                         "To just reload the data after each epoch set the command to 'true'."),
+  Option("trilingual", bool, default_value=False),
   Option("dropout", float, default_value=0.0),
   Option("weight_noise", float, default_value=0.0),
   Option("model", dict, default_value={}),
@@ -133,10 +134,16 @@ class XnmtTrainer(object):
                 self.args.batch_strategy.lower() == 'none')
 
   def pack_batches(self):
-    self.train_src, self.train_trg = \
-      self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
-    self.dev_src, self.dev_trg = \
-      self.batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
+    if self.args.trilingual:
+      self.train_mt, self.train_src, self.train_trg = \
+        self.batcher.pack([self.training_corpus.train_mt_data, self.training_corpus.train_src_data], self.training_corpus.train_trg_data)
+      self.dev_mt, self.dev_src, self.dev_trg = \
+        self.batcher.pack([self.training_corpus.dev_mt_data, self.training_corpus.dev_src_data], self.training_corpus.dev_trg_data)
+    else:
+      self.train_src, self.train_trg = \
+        self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
+      self.dev_src, self.dev_trg = \
+        self.batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
 
   def dynet_trainer_for_args(self, args, model_context):
     if args.trainer.lower() == "sgd":
@@ -218,14 +225,19 @@ class XnmtTrainer(object):
     self.model.set_train(update_weights)
     order = list(range(0, len(self.train_src)))
     np.random.shuffle(order)
+
     for batch_num in order:
       src = self.train_src[batch_num]
       trg = self.train_trg[batch_num]
-
+      if self.args.trilingual:
+        mt = self.train_mt[batch_num]
       # Loss calculation
       dy.renew_cg()
       loss_builder = LossBuilder()
-      standard_loss = self.model.calc_loss(src, trg)
+      if self.args.trilingual:
+        standard_loss = self.model.calc_loss(mt, src, trg)
+      else:
+        standard_loss = self.model.calc_loss(src, trg)
 
       loss_builder.add_loss("loss", standard_loss)
       additional_loss = self.model.calc_additional_loss(dy.nobackprop(-standard_loss))
@@ -322,7 +334,10 @@ class XnmtTrainer(object):
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
       dy.renew_cg()
-      standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
+      if self.args.trilingual:
+        standard_loss = self.model.calc_loss(self.dev_mt[i], self.dev_src[i], self.dev_trg[i])
+      else:
+        standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
       loss_builder.compute()

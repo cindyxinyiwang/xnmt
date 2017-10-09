@@ -289,6 +289,104 @@ class BilingualCorpusParser(CorpusParser, Serializable):
         training_corpus.dev_src_data.append(src_sent)
         training_corpus.dev_trg_data.append(trg_sent)
 
+
+class TrilingualCorpusParser(CorpusParser, Serializable):
+  """A class that reads in mt, src, trg corpora, consists of three InputReaders"""
+
+  yaml_tag = u"!TrilingualCorpusParser"
+  def __init__(self, mt_reader, src_reader, trg_reader, max_mt_len=None, max_src_len=None, max_trg_len=None,
+               max_num_train_sents=None, max_num_dev_sents=None, sample_train_sents=None):
+    """
+    :param src_reader: InputReader for source side
+    :param trg_reader: InputReader for target side
+    :param max_src_len: filter pairs longer than this on the source side
+    :param max_src_len: filter pairs longer than this on the target side
+    :param max_num_train_sents: only read the first n training sentences
+    :param max_num_dev_sents: only read the first n dev sentences
+    :param sample_train_sents: sample n sentences without replacement from the training corpus (should probably be used with a prespecified vocab)
+    """
+    self.mt_reader = mt_reader
+    self.src_reader = src_reader
+    self.trg_reader = trg_reader
+    self.max_mt_len = max_mt_len
+    self.max_src_len = max_src_len
+    self.max_trg_len = max_trg_len
+    self.max_num_train_sents = max_num_train_sents
+    self.max_num_dev_sents = max_num_dev_sents
+    self.sample_train_sents = sample_train_sents
+    self.train_src_len, self.train_trg_len = None, None
+    self.dev_src_len, self.dev_trg_len = None, None
+    if max_num_train_sents is not None and sample_train_sents is not None: raise RuntimeError("max_num_train_sents and sample_train_sents are mutually exclusive!")
+
+  def read_training_corpus(self, training_corpus):
+    training_corpus.train_mt_data = []
+    training_corpus.train_src_data = []
+    training_corpus.train_trg_data = []
+    if self.sample_train_sents:
+      self.train_mt_len = self.mt_reader.count_sents(training_corpus.train_mt)
+      self.train_src_len = self.src_reader.count_sents(training_corpus.train_src)
+      self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
+      if self.train_src_len != self.train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len, self.train_trg_len))
+      if self.train_mt_len != self.train_trg_len: raise RuntimeError("training mt sentences don't match trg sentences: %s != %s!" % (self.train_mt_len, self.train_trg_len))
+      self.sample_train_sents = int(self.sample_train_sents)
+      filter_ids = np.random.choice(self.train_src_len, self.sample_train_sents, replace=False)
+    elif self.max_num_train_sents:
+      self.train_mt_len = self.mt_reader.count_sents(training_corpus.train_mt)
+      self.train_src_len = self.src_reader.count_sents(training_corpus.train_src)
+      self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
+      if self.train_src_len != self.train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len, self.train_trg_len))
+      if self.train_mt_len != self.train_trg_len: raise RuntimeError("training mt sentences don't match trg sentences: %s != %s!" % (self.train_mt_len, self.train_trg_len))
+      filter_ids = list(range(min(self.max_num_train_sents, self.train_trg_len)))
+    else:
+      filter_ids = None
+    mt_train_iterator = self.mt_reader.read_sents(training_corpus.train_mt, filter_ids)
+    src_train_iterator = self.src_reader.read_sents(training_corpus.train_src, filter_ids)
+    trg_train_iterator = self.trg_reader.read_sents(training_corpus.train_trg, filter_ids)
+    for mt_sent, src_sent, trg_sent in six.moves.zip_longest(mt_train_iterator, src_train_iterator, trg_train_iterator):
+      if src_sent is None or trg_sent is None:
+        raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len or self.src_reader.count_sents(training_corpus.train_src), self.train_trg_len or self.trg_reader.count_sents(training_corpus.train_trg)))
+      if mt_sent is None or trg_sent is None:
+        raise RuntimeError("training mt sentences don't match trg sentences: %s != %s!" % (self.train_mt_len or self.src_reader.count_sents(training_corpus.train_src), self.train_trg_len or self.trg_reader.count_sents(training_corpus.train_trg)))        
+      mt_len_ok = self.max_mt_len is None or len(mt_sent) <= self.max_mt_len
+      src_len_ok = self.max_src_len is None or len(src_sent) <= self.max_src_len
+      trg_len_ok = self.max_trg_len is None or len(trg_sent) <= self.max_trg_len
+      if src_len_ok and trg_len_ok and mt_len_ok:
+        training_corpus.train_mt_data.append(mt_sent)
+        training_corpus.train_src_data.append(src_sent)
+        training_corpus.train_trg_data.append(trg_sent)
+    self.mt_reader.freeze()
+    self.src_reader.freeze()
+    self.trg_reader.freeze()
+
+    training_corpus.dev_mt_data = []
+    training_corpus.dev_src_data = []
+    training_corpus.dev_trg_data = []
+    if self.max_num_dev_sents:
+      self.dev_mt_len = self.dev_mt_len or self.mt_reader.count_sents(training_corpus.dev_mt)
+      self.dev_src_len = self.dev_src_len or self.src_reader.count_sents(training_corpus.dev_src)
+      self.dev_trg_len = self.dev_trg_len or self.trg_reader.count_sents(training_corpus.dev_trg)
+      if self.dev_src_len != self.dev_trg_len: raise RuntimeError("dev src sentences don't match trg sentences: %s != %s!" % (self.dev_src_len, self.dev_trg_len))
+      if self.dev_mt_len != self.dev_trg_len: raise RuntimeError("dev mt sentences don't match trg sentences: %s != %s!" % (self.dev_mt_len, self.dev_trg_len))
+
+      filter_ids = list(range(min(self.max_num_dev_sents, self.dev_src_len)))
+    else:
+      filter_ids = None
+
+    mt_dev_iterator = self.mt_reader.read_sents(training_corpus.dev_mt, filter_ids)  
+    src_dev_iterator = self.src_reader.read_sents(training_corpus.dev_src, filter_ids)
+    trg_dev_iterator = self.trg_reader.read_sents(training_corpus.dev_trg, filter_ids)
+    for mt_sent, src_sent, trg_sent in six.moves.zip_longest(mt_dev_iterator, src_dev_iterator, trg_dev_iterator):
+      if src_sent is None or trg_sent is None:
+        raise RuntimeError("dev src sentences don't match target trg: %s != %s!" % (self.src_reader.count_sents(training_corpus.dev_src), self.dev_trg_len), self.trg_reader.count_sents(training_corpus.dev_trg))
+      if mt_sent is None or trg_sent is None:
+        raise RuntimeError("dev mt sentences don't match target trg: %s != %s!" % (self.src_reader.count_sents(training_corpus.dev_mt), self.dev_trg_len), self.trg_reader.count_sents(training_corpus.dev_trg))
+      mt_len_ok = self.max_mt_len is None or len(mt_sent) <= self.max_mt_len
+      src_len_ok = self.max_src_len is None or len(src_sent) <= self.max_src_len
+      trg_len_ok = self.max_trg_len is None or len(trg_sent) <= self.max_trg_len
+      if src_len_ok and trg_len_ok and mt_len_ok:
+        training_corpus.dev_mt_data.append(mt_sent)
+        training_corpus.dev_src_data.append(src_sent)
+        training_corpus.dev_trg_data.append(trg_sent)
 ###### Obsolete Functions
 
 # TODO: The following doesn't follow the current API. If it is necessary, it should be retooled

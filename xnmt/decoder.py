@@ -38,7 +38,7 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
 
   def __init__(self, context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
-               rnn_spec="lstm", residual_to_output=False, input_feeding=False,
+               rnn_spec="lstm", residual_to_output=False, input_feeding=True,
                bridge=None):
     param_col = context.dynet_param_collection.param_col
     # Define dim
@@ -90,14 +90,15 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
     dec_state = self.fwd_lstm.initial_state()
     self.state = dec_state.set_s(self.bridge.decoder_init(enc_final_states))
     self.h_t = None
+    self.state_t = None
     self.add_input(ss_expr)
 
   def add_input(self, trg_embedding):
     inp = trg_embedding
     if self.input_feeding:
-      if self.h_t is not None:
+      if self.state_t is not None:
         # Append with the last state of the decoder
-        inp = dy.concatenate([inp, self.h_t])
+        inp = dy.concatenate([inp, self.state_t])
       else:
         # Append with zero
         zero = dy.zeros(self.lstm_dim, batch_size=inp.dim()[1])
@@ -107,6 +108,7 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
 
   def get_scores(self, context):
     self.h_t = dy.tanh(self.context_projector(dy.concatenate([context, self.state.output()])))
+    self.ctx_t = self.state.output()
     return self.vocab_projector(self.h_t)
 
   def calc_loss(self, context, ref_action):

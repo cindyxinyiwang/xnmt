@@ -7,32 +7,32 @@ defaults:
     err_file: examples/output/<EXP>.err
     run_for_epochs: 20
     eval_metrics: bleu,wer
-  preproc:
-    overwrite: False
-    preproc_specs:
-    - type: tokenize
-      in_files:
-      - examples/data/train.ja
-      - examples/data/train.en
-      - examples/data/dev.ja
-      - examples/data/dev.en
-      - examples/data/test.ja
-      - examples/data/test.en
-      out_files:
-      - examples/data/train.tok.ja
-      - examples/data/train.tok.en
-      - examples/data/dev.tok.ja
-      - examples/data/dev.tok.en
-      - examples/data/test.tok.ja
-      - examples/data/test.tok.en
-      specs:
-      - filenum: all
-        tokenizers:
-        - !ExternalTokenizer
+  #preproc:
+  #  overwrite: False
+  #  preproc_specs:
+    #- type: tokenize
+    #  in_files:
+    #  - examples/data/train.ja
+    #  - examples/data/train.en
+    #  - examples/data/dev.ja
+    #  - examples/data/dev.en
+    #  - examples/data/test.ja
+    #  - examples/data/test.en
+    #  out_files:
+    #  - examples/data/train.tok.ja
+    #  - examples/data/train.tok.en
+    #  - examples/data/dev.tok.ja
+    #  - examples/data/dev.tok.en
+    #  - examples/data/test.tok.ja
+    #  - examples/data/test.tok.en
+    #  specs:
+    #  - filenum: all
+    #    tokenizers:
+    #    - !ExternalTokenizer
           # Replace <XNMT_PATH> with root directory of xnmt repository
-          path: /Users/cindywang/Documents/research/TSG/xnmt/script/code/toy_word_tokenize.py
-          tokenizer_args: 
-            --character: 0
+    #      path: /Users/cindywang/Documents/research/TSG/xnmt/script/code/toy_word_tokenize.py
+    #      tokenizer_args: 
+     #       --character: 0
         #- !SentencepieceTokenizer
           # Replace <SENTENCEPIECE_SRC_PATH> with src/ directory of sentencepiece repository
           # The spm_* executables should be located at <SENTENCEPIECE_SRC_PATH>
@@ -42,50 +42,54 @@ defaults:
         #   - examples/data/train.en
         #  vocab_size: 10000
         #  model_type: bpe
-    - type: normalize
-      in_files:
-      - examples/data/train.tok.ja
-      - examples/data/train.tok.en
-      - examples/data/dev.tok.ja
-      - examples/data/dev.tok.en
-      - examples/data/test.tok.ja
-      - examples/data/test.tok.en
-      out_files:
-      - examples/output/train.norm.ja
-      - examples/output/train.norm.en
-      - examples/output/dev.norm.ja
-      - examples/output/dev.norm.en
-      - examples/output/test.norm.ja
-      - examples/output/test.norm.en
-      specs:
-      - filenum: all
-        spec:
-        - type: lower
-    - type: filter
-      in_files:
-      - examples/output/train.norm.ja
-      - examples/output/train.norm.en
-      out_files:
-      - examples/output/train.filter.ja
-      - examples/output/train.filter.en
-      specs:
-      - type: length
-        min: 1
-        max: 25
-    - type: vocab
-      in_files:
-      - examples/output/train.norm.ja
-      - examples/output/train.norm.en
-      out_files:
-      - examples/output/train.vocab.ja
-      - examples/output/train.vocab.en
-      specs:
-      - filenum: all
-        spec:
-        - type: freq
-          min_freq: 2
+    #- type: normalize
+    #  in_files:
+    #  - examples/data/train.tok.ja
+    #  - examples/data/train.tok.en
+    #  - examples/data/dev.tok.ja
+    #  - examples/data/dev.tok.en
+    #  - examples/data/test.tok.ja
+    #  - examples/data/test.tok.en
+    #  out_files:
+    #  - examples/output/train.norm.ja
+    #  - examples/output/train.norm.en
+    #  - examples/output/dev.norm.ja
+    #  - examples/output/dev.norm.en
+    #  - examples/output/test.norm.ja
+    #  - examples/output/test.norm.en
+    #  specs:
+    #  - filenum: all
+    #    spec:
+    #    - type: lower
+    #- type: filter
+    #  in_files:
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.mt
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.src
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.pe
+    #  out_files:
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.mt
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.src
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.pe
+    #  specs:
+    #  - type: length
+    #    min: 1
+    #    max: 50
+    #- type: vocab
+    #  in_files:
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.mt
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.src
+    #  - /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.pe
+    #  out_files:
+    #  - examples/output/ende_train.vocab.mt
+    #  - examples/output/ende_train.vocab.src
+    #  - examples/output/ende_train.vocab.pe
+    #  specs:
+    #  - filenum: all
+    #    spec:
+    #    - type: freq
+    #      min_freq: 2
   train:
-    default_layer_dim: 512
+    default_layer_dim: 1024
     restart_trainer: True
     trainer: Adam
     learning_rate: 0.0002
@@ -94,22 +98,22 @@ defaults:
     batch_size: 32
     trilingual: True
     training_corpus: !TrilingualTrainingCorpus
-      train_mt: examples/output/train.norm.en
-      train_src: examples/output/train.norm.ja
-      train_trg: examples/output/train.norm.en
-      dev_mt: examples/output/dev.norm.en
-      dev_src: examples/output/dev.norm.ja
-      dev_trg: examples/output/dev.norm.en
+      train_mt:  /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.mt
+      train_src:  /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.src
+      train_trg:  /projects/tir2/users/xinyiw1/post_edit/en_de/train/train.bpe.filter.pe
+      dev_mt:  /projects/tir2/users/xinyiw1/post_edit/en_de/dev/dev.bpe.mt
+      dev_src:  /projects/tir2/users/xinyiw1/post_edit/en_de/dev/dev.bpe.src
+      dev_trg:  /projects/tir2/users/xinyiw1/post_edit/en_de/dev/dev.pe
     corpus_parser: !TrilingualCorpusParser
       mt_reader: !PlainTextReader
         vocab: !Vocab
-          vocab_file: examples/output/train.vocab.en
+          vocab_file: examples/output/ende_train.vocab.mt
       src_reader: !PlainTextReader
         vocab: !Vocab
-          vocab_file: examples/output/train.vocab.ja
+          vocab_file: examples/output/ende_train.vocab.src
       trg_reader: !PlainTextReader
         vocab: !Vocab
-          vocab_file: examples/output/train.vocab.en
+          vocab_file: examples/output/ende_train.vocab.pe
     model: !DoubleEncTranslator
       mt_embedder: !SimpleWordEmbedder
         emb_dim: 512
@@ -117,27 +121,32 @@ defaults:
         emb_dim: 512
       mt_encoder: !LSTMEncoder
         layers: 1
+        hidden_dim: 2048
       src_encoder: !LSTMEncoder
         layers: 1
+        hidden_dim: 2048
       attender: !DoubleAttender
-        hidden_dim: 512
-        state_dim: 512
-        input_dim: 512
+        hidden_dim: 1024
+        state_dim: 1024
+        input_dim: 2048
       trg_embedder: !SimpleWordEmbedder
         emb_dim: 512
       decoder: !MlpSoftmaxDecoder
         layers: 1
-        input_dim: 1024
-        mlp_hidden_dim: 512
+        input_dim: 4096
+        mlp_hidden_dim: 1024
+        input_feeding: True
         bridge: !LinearBridge
           dec_layers: 1
-          enc_dim: 1024
+          enc_dim: 4096
   decode:
-    mt_file: examples/output/test.norm.en
-    src_file: examples/output/test.norm.ja
+    mt_file: /projects/tir2/users/xinyiw1/post_edit/en_de/test/test.mt.bpe
+    src_file: /projects/tir2/users/xinyiw1/post_edit/en_de/test/test.src.bpe
+    post_process: join-bpe
+    beam: 12
   evaluate:
-    ref_file: examples/output/test.norm.en
+    ref_file: /projects/tir2/users/xinyiw1/post_edit/en_de/test/test.pe
 
-double-preproc:
+double-ende-inputfeed:
   train:
-    dropout: 0.1
+    dropout: 0.2

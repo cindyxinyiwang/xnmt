@@ -11,3 +11,5 @@ xnmt/cython/*.cpp
 xnmt/cython/*.c
 xnmt/cython/*.so
 dist
+*.out
+*.sh

@@ -3,6 +3,7 @@ __pycache__
 *.swp
 *.pyc
 *.so
+.idea
 examples/output
 doc/build
 xnmt.egg-info
@@ -10,4 +11,5 @@ build/
 xnmt/cython/*.cpp
 xnmt/cython/*.c
 xnmt/cython/*.so
+test/tmp
 dist/

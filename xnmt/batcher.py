@@ -72,10 +72,20 @@ class Batcher(object):
     return False
 
   def add_single_batch(self, src_curr, trg_curr, src_ret, trg_ret):
-    src_id, src_mask = pad(src_curr, pad_token=self.src_pad_token)
-    src_ret.append(Batch(src_id, src_mask))
-    trg_id, trg_mask = pad(trg_curr, pad_token=self.trg_pad_token)
-    trg_ret.append(Batch(trg_id, trg_mask))
+    if type(src_curr[0]) == list:
+      src_id0, src_mask0 = pad(src_curr[0], pad_token=self.src_pad_token)
+      src_id1, src_mask1 = pad(src_curr[1], pad_token=self.src_pad_token)
+      src_ret.append( [Batch(src_id0, src_mask0), Batch(src_id1, src_mask1)] )
+    else:
+      src_id, src_mask = pad(src_curr, pad_token=self.src_pad_token)
+      src_ret.append(Batch(src_id, src_mask))
+    if type(trg_curr[0]) == list:
+      trg_id0, trg_mask0 = pad(trg_curr[0], pad_token=self.trg_pad_token)
+      trg_id1, trg_mask1 = pad(trg_curr[1], pad_token=self.trg_pad_token)
+      trg_ret.append( [Batch(trg_id0, trg_mask0), Batch(trg_id1, trg_mask1)] )
+    else:
+      trg_id, trg_mask = pad(trg_curr, pad_token=self.trg_pad_token)
+      trg_ret.append(Batch(trg_id, trg_mask))
 
   def pack_by_order(self, src, trg, order):
     src_ret, src_curr = [], []
@@ -133,7 +143,10 @@ class SortBatcher(Batcher):
     self.sort_key = sort_key
 
   def pack(self, src, trg):
+    if type(src[0][0]) == list:
+      self.sort_key = lambda x: len(x[0][0])
     order = np.argsort([self.sort_key(x) for x in six.moves.zip(src,trg)])
+    
     return self.pack_by_order(src, trg, order)
 
 # Module level functions

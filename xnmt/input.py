@@ -244,14 +244,18 @@ class BilingualCorpusParser(CorpusParser, Serializable):
     if self.sample_train_sents:
       self.train_src_len = self.src_reader.count_sents(training_corpus.train_src)
       self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
-      if self.train_src_len != self.train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len, self.train_trg_len))
+      train_src_len = self.train_src_len if type(self.train_src_len) != list else self.train_src_len[0]
+      train_trg_len = self.train_trg_len if type(self.train_trg_len) != list else self.train_trg_len[0]
+      if train_src_len != train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (train_src_len, train_trg_len))
       self.sample_train_sents = int(self.sample_train_sents)
-      filter_ids = np.random.choice(self.train_src_len, self.sample_train_sents, replace=False)
+      filter_ids = np.random.choice(train_src_len, self.sample_train_sents, replace=False)
     elif self.max_num_train_sents:
       self.train_src_len = self.src_reader.count_sents(training_corpus.train_src)
       self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
-      if self.train_src_len != self.train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len, self.train_trg_len))
-      filter_ids = list(range(min(self.max_num_train_sents, self.train_trg_len)))
+      train_src_len = self.train_src_len if type(self.train_src_len) != list else self.train_src_len[0]
+      train_trg_len = self.train_trg_len if type(self.train_trg_len) != list else self.train_trg_len[0]
+      if train_src_len != train_trg_len: raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (train_src_len, train_trg_len))
+      filter_ids = list(range(min(self.max_num_train_sents, train_trg_len)))
     else:
       filter_ids = None
     src_train_iterator = self.src_reader.read_sents(training_corpus.train_src, filter_ids)
@@ -259,8 +263,12 @@ class BilingualCorpusParser(CorpusParser, Serializable):
     for src_sent, trg_sent in six.moves.zip_longest(src_train_iterator, trg_train_iterator):
       if src_sent is None or trg_sent is None:
         raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (self.train_src_len or self.src_reader.count_sents(training_corpus.train_src), self.train_trg_len or self.trg_reader.count_sents(training_corpus.train_trg)))
-      src_len_ok = self.max_src_len is None or len(src_sent) <= self.max_src_len
-      trg_len_ok = self.max_trg_len is None or len(trg_sent) <= self.max_trg_len
+      
+      src_len = max(map(lambda x: len(x), src_sent)) if type(src_sent) == list else len(src_sent)
+      trg_len = max(map(lambda x: len(x), trg_sent)) if type(trg_sent) == list else len(trg_sent)
+
+      src_len_ok = self.max_src_len is None or src_len <= self.max_src_len
+      trg_len_ok = self.max_trg_len is None or trg_len <= self.max_trg_len
       if src_len_ok and trg_len_ok:
         training_corpus.train_src_data.append(src_sent)
         training_corpus.train_trg_data.append(trg_sent)
@@ -273,7 +281,9 @@ class BilingualCorpusParser(CorpusParser, Serializable):
     if self.max_num_dev_sents:
       self.dev_src_len = self.dev_src_len or self.src_reader.count_sents(training_corpus.dev_src)
       self.dev_trg_len = self.dev_trg_len or self.trg_reader.count_sents(training_corpus.dev_trg)
-      if self.dev_src_len != self.dev_trg_len: raise RuntimeError("dev src sentences don't match trg sentences: %s != %s!" % (self.dev_src_len, self.dev_trg_len))
+      dev_src_len = self.dev_src_len if type(self.dev_src_len) != list else self.dev_src_len[0]
+      dev_trg_len = self.dev_trg_len if type(self.dev_trg_len) != list else self.dev_trg_len[0]
+      if dev_src_len != dev_trg_len: raise RuntimeError("dev src sentences don't match trg sentences: %s != %s!" % (self.dev_src_len, self.dev_trg_len))
       filter_ids = list(range(min(self.max_num_dev_sents, self.dev_src_len)))
     else:
       filter_ids = None
@@ -283,12 +293,69 @@ class BilingualCorpusParser(CorpusParser, Serializable):
     for src_sent, trg_sent in six.moves.zip_longest(src_dev_iterator, trg_dev_iterator):
       if src_sent is None or trg_sent is None:
         raise RuntimeError("dev src sentences don't match target trg: %s != %s!" % (self.src_reader.count_sents(training_corpus.dev_src), self.dev_trg_len), self.trg_reader.count_sents(training_corpus.dev_trg))
-      src_len_ok = self.max_src_len is None or len(src_sent) <= self.max_src_len
-      trg_len_ok = self.max_trg_len is None or len(trg_sent) <= self.max_trg_len
+      src_len = max(map(lambda x: len(x), src_sent)) if type(src_sent) == list else len(src_sent)
+      trg_len = max(map(lambda x: len(x), trg_sent)) if type(trg_sent) == list else len(trg_sent)
+
+      src_len_ok = self.max_src_len is None or src_len <= self.max_src_len
+      trg_len_ok = self.max_trg_len is None or trg_len <= self.max_trg_len
       if src_len_ok and trg_len_ok:
         training_corpus.dev_src_data.append(src_sent)
         training_corpus.dev_trg_data.append(trg_sent)
 
+class MultiTextReader(InputReader, Serializable):
+  """ A class that handles two readers at the same time """
+  yaml_tag = u"!MultiTextReader"
+  def __init__(self, reader1, reader2):
+    self.reader1 = reader1
+    self.reader2 = reader2
+
+  def read_sents(self, filename, filter_ids=None):
+    assert len(filename) == 2, "MultiCorpusReader, length of file name does not match reader number"
+    if self.reader1.vocab is None:
+      self.reader1.vocab = Vocab()
+    if self.reader2.vocab is None:
+      self.reader2.vocab = Vocab()
+    return map(lambda l: [SimpleSentenceInput([self.reader1.vocab.convert(word) for word in l[0].strip().split()] + \
+                                                      [self.reader1.vocab.convert(Vocab.ES_STR)]), \
+                              SimpleSentenceInput([self.reader2.vocab.convert(word) for word in l[1].strip().split()] + \
+                                                      [self.reader2.vocab.convert(Vocab.ES_STR)])], \
+               self.iterate_filtered(filename, filter_ids))
+
+  def freeze(self):
+    self.reader1.vocab.freeze()
+    self.reader1.vocab.set_unk(Vocab.UNK_STR)
+    self.reader1.overwrite_serialize_param("vocab", self.reader1.vocab)
+    self.reader2.vocab.freeze()
+    self.reader2.vocab.set_unk(Vocab.UNK_STR)
+    self.reader2.overwrite_serialize_param("vocab", self.reader2.vocab)
+
+  def vocab_size(self):
+    #return [len(self.reader1.vocab), len(self.reader2.vocab)]
+    return len(self.reader1.vocab)
+
+  def count_sents(self, filename):
+    assert len(filename) == 2, "MultiCorpusReader, length of file name does not match reader number"
+    return [self.reader1.count_sents(filename[0]), self.reader2.count_sents(filename[1])]
+
+  def iterate_filtered(self, filename, filter_ids=None):
+    """
+    :param filename: data file (text file)
+    :param filter_ids:
+    :returns: iterator over lines as strings (useful for subclasses to implement read_sents)
+    """
+    sent_count = 0
+    max_id = None
+    if filter_ids is not None:
+      max_id = max(filter_ids)
+      filter_ids = set(filter_ids)
+    with io.open(filename[0], encoding='utf-8') as f1:
+      with io.open(filename[1], encoding='utf-8') as f2:
+        for line1, line2 in zip(f1, f2):
+          if filter_ids is None or sent_count in filter_ids:
+            yield [line1, line2]
+          sent_count += 1
+          if max_id is not None and sent_count > max_id:
+            break
 ###### Obsolete Functions
 
 # TODO: The following doesn't follow the current API. If it is necessary, it should be retooled

@@ -97,6 +97,8 @@ def output_processor_for_spec(spec):
     return JoinedCharTextOutputProcessor()
   elif spec == "join-bpe":
     return JoinedBPETextOutputProcessor()
+  elif spec == "join-sent-piece":
+    return JoinedSentPieceTextOutputProcessor()
   else:
     raise RuntimeError("Unknown postprocessing argument {}".format(spec))
 

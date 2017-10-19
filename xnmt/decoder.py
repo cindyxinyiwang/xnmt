@@ -131,6 +131,119 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
   def set_train(self, val):
     self.fwd_lstm.set_dropout(self.dropout if val else 0.0)
 
+class TreeDecoderState:
+  """A state holding all the information needed for MLPSoftmaxDecoder"""
+  def __init__(self, rnn_state=None, context=None, states=None):
+    self.rnn_state = rnn_state
+    self.context = context
+    self.states = states
+
+class TreeDecoder(RnnDecoder, Serializable):
+  # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
+  # For now the default behavior is hard coded.
+
+  yaml_tag = u'!TreeDecoder'
+
+  def __init__(self, context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
+               mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
+               rnn_spec="lstm", residual_to_output=False, input_feeding=True,
+               bridge=None):
+    param_col = context.dynet_param_collection.param_col
+    self.param_col = param_col
+    # Define dim
+    lstm_dim       = lstm_dim or context.default_layer_dim
+    mlp_hidden_dim = mlp_hidden_dim or context.default_layer_dim
+    trg_embed_dim  = trg_embed_dim or context.default_layer_dim
+    input_dim      = input_dim or context.default_layer_dim
+    self.input_dim = input_dim
+    # Input feeding
+    self.input_feeding = input_feeding
+    self.lstm_dim = lstm_dim
+    lstm_input = trg_embed_dim
+    if input_feeding:
+      lstm_input += input_dim
+    # parent state
+    lstm_input += lstm_dim
+    # Bridge
+    self.lstm_layers = layers
+    self.bridge = bridge or NoBridge(context, self.lstm_layers, self.lstm_dim)
+
+    # LSTM
+    self.fwd_lstm  = RnnDecoder.rnn_from_spec(spec       = rnn_spec,
+                                              num_layers = layers,
+                                              input_dim  = lstm_input,
+                                              hidden_dim = lstm_dim,
+                                              model = param_col,
+                                              residual_to_output = residual_to_output)
+    # MLP
+    self.context_projector = xnmt.linear.Linear(input_dim  = input_dim + lstm_dim,
+                                           output_dim = mlp_hidden_dim,
+                                           model = param_col)
+    self.vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
+                                         output_dim = vocab_size,
+                                         model = param_col)
+    # Dropout
+    self.dropout = dropout or context.dropout
+
+  def shared_params(self):
+    return [set(["layers", "bridge.dec_layers"]),
+            set(["lstm_dim", "bridge.dec_dim"])]
+
+  def initial_state(self, enc_final_states, ss_expr):
+    """Get the initial state of the decoder given the encoder final states.
+
+    :param enc_final_states: The encoder final states.
+    :returns: An MlpSoftmaxDecoderState
+    """
+    rnn_state = self.fwd_lstm.initial_state()
+    rnn_state = rnn_state.set_s(self.bridge.decoder_init(enc_final_states))
+    zeros = dy.zeros(self.lstm_dim + self.input_dim) if self.input_feeding \
+      else  dy.zeros(self.lstm_dim)
+    rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
+    return TreeDecoderState(rnn_state=rnn_state, context=zeros, states=[rnn_state])
+
+  def add_input(self, tree_dec_state, trg_embedding, trg):
+    """Add an input and update the state.
+
+    :param tree_dec_state: An TreeDecoderState object containing the current state.
+    :param trg_embedding: The embedding of the word to input.
+    :param trg: The data list of the target word, with the first element as the word index, the rest as timestep.
+    :returns: The update MLP decoder state.
+    """
+    inp = trg_embedding
+    if self.input_feeding:
+      inp = dy.concatenate([inp, tree_dec_state.context])
+    if type(trg) == list:
+      inp = dy.concatenate([inp, tree_dec_state.states[trg.get_col(1)]])
+    else:
+      inp = dy.concatenate([inp, dy.zeros(self.lstm_dim)])
+    rnn_state = tree_dec_state.rnn_state.add_input(inp)
+    return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
+                            states=tree_dec_state.states+[rnn_state])
+
+  def get_scores(self, tree_dec_state):
+    """Get scores given a current state.
+
+    :param mlp_dec_state: An MlpSoftmaxDecoderState object.
+    :returns: Scores over the vocabulary given this state.
+    """
+    h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
+    return self.vocab_projector(h_t)
+
+  def calc_loss(self, tree_dec_state, ref_action):
+    scores = self.get_scores(tree_dec_state)
+    ref_word = ref_action.get_col(0)
+    # single mode
+    if not xnmt.batcher.is_batched(ref_action):
+      return dy.pickneglogsoftmax(scores, ref_word)
+    # minibatch mode
+    else:
+      return dy.pickneglogsoftmax_batch(scores, ref_word)
+
+  @recursive
+  def set_train(self, val):
+    self.fwd_lstm.set_dropout(self.dropout if val else 0.0)
+
 class Bridge(object):
   """
   Responsible for initializing the decoder LSTM, based on the final encoder state

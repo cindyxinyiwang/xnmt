@@ -1,0 +1,45 @@
+defaults:
+  experiment:
+    model_file: examples/output/<EXP>.mod
+    hyp_file: examples/output/<EXP>.hyp
+    out_file: examples/output/<EXP>.out
+    err_file: examples/output/<EXP>.err
+    cfg_file: examples/output/<EXP>.yaml
+    run_for_epochs: 20
+    eval_metrics: bleu
+  train:
+    dropout: 0.1
+    default_layer_dim: 512
+    restart_trainer: True
+    trainer: Adam
+    learning_rate: 0.0002
+    lr_decay: 0.5
+    dev_metrics: bleu
+    batch_size: 2
+    training_corpus: !BilingualTrainingCorpus
+      train_src: examples/data/train.ja
+      train_trg: examples/data/train.parse.en
+      dev_src: examples/data/dev.ja
+      dev_trg: examples/data/dev.parse.en
+    corpus_parser: !BilingualCorpusParser
+      src_reader: !PlainTextReader {}
+      trg_reader: !TreeReader {}
+    model: !DefaultTranslator
+      src_embedder: !SimpleWordEmbedder {}
+      encoder: !LSTMEncoder
+        layers: 1
+      attender: !StandardAttender {}
+      trg_embedder: !SimpleWordEmbedder {}
+      decoder: !TreeDecoder
+        layers: 1
+        mlp_hidden_dim: 512
+        bridge: !CopyBridge {}
+  decode:
+    beam: 5
+    len_norm_type: !PolynomialNormalization
+      apply_during_search: true
+    src_file: examples/data/test.ja
+  evaluate:
+    ref_file: examples/data/test.en
+
+standard:

@@ -14,6 +14,10 @@ class Batch(list):
   def __init__(self, batch_list, mask=None):
     super(Batch, self).__init__(batch_list)
     self.mask = mask
+
+  def get_col(self, col):
+
+    return mark_as_batch(np.reshape(self, (len(self), len(self[0])))[:, col], mask=self.mask)
   
 class Mask(object):
   """

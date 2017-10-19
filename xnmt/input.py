@@ -2,6 +2,7 @@ import numpy as np
 import os
 import io
 import six
+import re
 from collections import defaultdict
 from six.moves import zip_longest, map
 from xnmt.serializer import Serializable
@@ -289,6 +290,235 @@ class BilingualCorpusParser(CorpusParser, Serializable):
         training_corpus.dev_src_data.append(src_sent)
         training_corpus.dev_trg_data.append(trg_sent)
 
+class TreeInput(Input):
+  """
+  A tree input, represented as a list of rule indices and other information
+  each item in words is a list of data
+  """
+  def __init__(self, words):
+    self.words = words
+
+  def __len__(self):
+    return len(self.words)
+
+  def __getitem__(self, key):
+    return self.words[key]
+
+  def get_padded_sent(self, token, pad_len):
+    if pad_len == 0:
+      return self
+    new_words = list(self.words)
+    new_words.extend([[token]*2 ] * pad_len)
+    return TreeInput(new_words)
+
+  def __str__(self):
+    return " ".join(six.moves.map(str, self.words))
+
+class Tree(object):
+  """A class that represents a parse tree"""
+
+  yaml_tag = u"!Tree"
+  def __init__(self, string, children):
+    self.label = string 
+    self.children = children
+    for c in children:
+      if hasattr(c, "set_parent"):
+        c.set_parent(self)
+    self._parent = None
+    self.timestep = -1
+
+  @classmethod
+  def from_rule_deriv(cls, derivs):
+    r0 = derivs[0]
+    root = Tree(r0.lhs, [child for child in r0.rhs if not child in r0.open_nonterms ])
+    if len(r0.open_nonterms) == 0:
+      #assert len(derivs) == 1
+      return root 
+    stack_tree = [ root ]
+    stack_children_left = [len(r0.open_nonterms)]
+    for r in derivs[1:]:
+      p_tree, p_children_left = stack_tree.pop(), stack_children_left.pop()
+      new_tree = Tree(r.lhs, [child for child in r.rhs if not child in r.open_nonterms])
+      p_tree.children.append(new_tree)
+      new_tree._parent = p_tree
+      p_children_left -= 1
+      if p_children_left > 0:
+        stack_tree.append(p_tree)
+        stack_children_left.append(p_children_left)
+      if len(r.open_nonterms) > 0:
+        stack_tree.append(new_tree)
+        stack_children_left.append(len(r.open_nonterms))
+    return root
+
+  def __str__(self):
+    c_str = []
+    stack = [self]
+    add_paren_len = [0]
+    while stack:
+      while add_paren_len[-1] == len(stack):
+        assert len(c_str) > 0
+        add_paren_len.pop()
+        c_str[-1] += ")"
+      cur= stack.pop()
+      c_str.append("(" + cur.label)
+      for c in reversed(cur.children):
+        if type(c) == str or type(c) == unicode:
+          c_str.append(c)
+        else:
+          stack.append(c)
+          add_paren_len.append(len(stack)-1)
+    c_str[-1] += ")" * len(add_paren_len)
+    return " ".join(c_str)
+
+  def to_sentence(self, piece=False):
+    '''
+    convert subtree into the sentence it represents
+    '''
+    toks = []
+    
+    stack = [self]
+    add_space_len = []
+    while stack:
+      #sub_word = True
+      init_stack_len = len(stack)
+      if add_space_len and add_space_len[-1] == len(stack):
+        toks.append(" ")
+        add_space_len.pop()
+      cur = stack.pop()
+      for c in reversed(cur.children):
+        if type(c) == str or type(c) == unicode:
+          toks.append(c)
+        else:
+          stack.append(c)
+      if not "_sub" in cur.label and not piece:
+        add_space_len.append(init_stack_len-1)
+    if not piece:
+      return "".join(toks)
+    else:
+      return " ".join(toks)
+
+  def parent(self):
+    return self._parent
+
+  def set_parent(self, new_parent):
+    self._parent = new_parent
+
+  def set_timestep(self, t, t2n=None):
+    '''
+    initialize timestep for each node
+    '''
+    self.timestep = t 
+    if not t2n is None:
+      assert self.timestep == len(t2n)
+      t2n.append(self)
+    for c in self.children:
+      if hasattr(c, 'set_timestep'):
+        t = c.set_timestep(t+1, t2n)
+    return t
+
+  def _get_data_helper(self, deriv, paren_t):
+    ''' deprecated method '''
+    children = []
+    open_nonterms = []
+    for c in self.children:
+      if type(c) == str or type(c) == unicode:
+        children.append(c)
+      else:
+        children.append(c.label)
+        open_nonterms.append(c.label)
+    #print self
+    #deriv.append(self.label + '|||' + " ".join(children))
+    deriv.append(Rule(self.label, children, open_nonterms))
+    if self.parent():
+      paren_t.append(self.parent().timestep)
+    else:
+      paren_t.append(0)
+    for c in self.children:
+      if hasattr(c, 'get_data'):
+        c.get_data(deriv, paren_t)
+
+  def get_data_root(self, rule_vocab):
+    self.t2n = []
+    self.set_timestep(0, self.t2n)
+    data = []
+    for t in xrange(len(self.t2n)):
+      node = self.t2n[t]
+      children, open_nonterms = [], []
+      for c in node.children:
+        if type(c) == str or type(c) == unicode:
+          children.append(c)
+        else:
+          children.append(c.label)
+      paren_t = 0 if not node.parent() else node.parent().timestep
+      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t])
+    return data
+
+class TreeReader(BaseTextReader, Serializable):
+  """
+  Reads in parse tree file, with one line per 
+  parse tree. The vocab object has to be a RuleVocab
+  """
+  yaml_tag = u'!TreeReader'
+  def __init__(self, vocab=None):
+    self.vocab = vocab
+    if vocab is not None:
+      self.vocab.freeze()
+      self.vocab.set_unk(Vocab.UNK_STR)
+
+  def read_sents(self, filename, filter_ids=None):
+    if self.vocab is None:
+      self.vocab = RuleVocab()
+    for line in self.iterate_filtered(filename, filter_ids):
+      tree = parse_root(tokenize(line))
+      yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*2 ]) 
+
+  def freeze(self):
+    self.vocab.freeze()
+    self.vocab.set_unk(Vocab.UNK_STR)
+    self.overwrite_serialize_param("vocab", self.vocab)
+
+  def vocab_size(self):
+    return len(self.vocab)
+
+# Tokenize a string.
+# Tokens yielded are of the form (type, string)
+# Possible values for 'type' are '(', ')' and 'WORD'
+def tokenize(s):
+  toks = re.compile(' +|[^() ]+|[()]')
+  for match in toks.finditer(s):
+    s = match.group(0)
+    if s[0] == ' ':
+      continue
+    if s[0] in '()':
+      yield (s, s)
+    else:
+      yield ('WORD', s)
+
+
+# Parse once we're inside an opening bracket.
+def parse_inner(toks):
+  ty, name = next(toks)
+  if ty != 'WORD': raise ParseError
+  children = []
+  while True:
+    ty, s = next(toks)
+    #print ty, s
+    if ty == '(':
+      children.append(parse_inner(toks))
+    elif ty == ')':
+      return Tree(name, children)
+    else:
+      children.append(s)
+
+# Parse this grammar:
+# ROOT ::= '(' INNER
+# INNER ::= WORD ROOT* ')'
+# WORD ::= [A-Za-z]+
+def parse_root(toks):
+
+  ty, _ = next(toks)
+  if ty != '(': raise ParseError
+  return parse_inner(toks)
 ###### Obsolete Functions
 
 # TODO: The following doesn't follow the current API. If it is necessary, it should be retooled

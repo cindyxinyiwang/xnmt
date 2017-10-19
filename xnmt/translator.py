@@ -218,10 +218,14 @@ class TranslatorMLELoss(Serializable):
     trg_mask = trg.mask if xnmt.batcher.is_batched(trg) else None
     losses = []
     seq_len = len(trg[0]) if xnmt.batcher.is_batched(src) else len(trg)
+    trg_is_list = type(trg[0][0]) == list
     if xnmt.batcher.is_batched(src):
       for j, single_trg in enumerate(trg):
         assert len(single_trg) == seq_len # assert consistent length
-        assert 1==len([i for i in range(seq_len) if (trg_mask is None or trg_mask.np_arr[j,i]==0) and single_trg[i]==Vocab.ES]) # assert exactly one unmasked ES token
+        if not trg_is_list:
+          assert 1==len([i for i in range(seq_len) if (trg_mask is None or trg_mask.np_arr[j,i]==0) and single_trg[i]==Vocab.ES]) # assert exactly one unmasked ES token
+        else:
+          assert 1==len([i for i in range(seq_len) if (trg_mask is None or trg_mask.np_arr[j,i]==0) and single_trg[i]==[Vocab.ES, Vocab.ES] ])
     for i in range(seq_len):
       ref_word = trg[i] if not xnmt.batcher.is_batched(src) \
                       else xnmt.batcher.mark_as_batch([single_trg[i] for single_trg in trg])
@@ -232,8 +236,11 @@ class TranslatorMLELoss(Serializable):
         word_loss = trg_mask.cmult_by_timestep_expr(word_loss, i, inverse=True)
       losses.append(word_loss)
       if i < seq_len-1:
-        dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(ref_word))
-
+        if trg_is_list:
+          word = ref_word.get_col(0) if type(ref_word[0]) == list else ref_word
+          dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word), ref_word)
+        else:
+          dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(ref_word))
     return dy.esum(losses)
 
 class TranslatorReinforceLoss(Serializable, HierarchicalModel):

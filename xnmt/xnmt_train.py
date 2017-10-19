@@ -221,7 +221,6 @@ class XnmtTrainer(object):
     for batch_num in order:
       src = self.train_src[batch_num]
       trg = self.train_trg[batch_num]
-
       # Loss calculation
       dy.renew_cg()
       loss_builder = LossBuilder()

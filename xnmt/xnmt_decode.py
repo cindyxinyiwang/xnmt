@@ -86,7 +86,10 @@ def xnmt_decode(args, model_elements=None):
         outputs = NO_DECODING_ATTEMPTED
       else:
         dy.renew_cg()
-        outputs = generator.generate_output(src, i)
+        if hasattr(corpus_parser.trg_reader.vocab, 'rule_index_with_lhs'):
+          outputs = generator.generate_output(src, i, trg_rule_vocab=trg_vocab)
+        else:
+          outputs = generator.generate_output(src, i)
       # Printing to trg file
       fp.write(u"{}\n".format(outputs))
 

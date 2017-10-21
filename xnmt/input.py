@@ -314,41 +314,17 @@ class TreeInput(Input):
   def __str__(self):
     return " ".join(six.moves.map(str, self.words))
 
-class Tree(object):
-  """A class that represents a parse tree"""
-
-  yaml_tag = u"!Tree"
-  def __init__(self, string, children):
+class TreeNode(object):
+  """A class that represents a tree node object """
+  def __init__(self, string, children=[], timestep=-1, id=-1):
     self.label = string 
     self.children = children
     for c in children:
       if hasattr(c, "set_parent"):
         c.set_parent(self)
-    self._parent = None
-    self.timestep = -1
-
-  @classmethod
-  def from_rule_deriv(cls, derivs):
-    r0 = derivs[0]
-    root = Tree(r0.lhs, [child for child in r0.rhs if not child in r0.open_nonterms ])
-    if len(r0.open_nonterms) == 0:
-      #assert len(derivs) == 1
-      return root 
-    stack_tree = [ root ]
-    stack_children_left = [len(r0.open_nonterms)]
-    for r in derivs[1:]:
-      p_tree, p_children_left = stack_tree.pop(), stack_children_left.pop()
-      new_tree = Tree(r.lhs, [child for child in r.rhs if not child in r.open_nonterms])
-      p_tree.children.append(new_tree)
-      new_tree._parent = p_tree
-      p_children_left -= 1
-      if p_children_left > 0:
-        stack_tree.append(p_tree)
-        stack_children_left.append(p_children_left)
-      if len(r.open_nonterms) > 0:
-        stack_tree.append(new_tree)
-        stack_children_left.append(len(r.open_nonterms))
-    return root
+    self._parent = None 
+    self.timestep = timestep
+    self.id = id 
 
   def __str__(self):
     c_str = []
@@ -403,43 +379,124 @@ class Tree(object):
   def set_parent(self, new_parent):
     self._parent = new_parent
 
-  def set_timestep(self, t, t2n=None):
+  def add_child(self, child, id2n=None):
+    self.children.append(child)
+    if hasattr(child, "set_parent"):
+      child.set_parent(self)
+      if id2n:
+        child.id = len(id2n)
+        id2n[child.id] = child
+        return child.id 
+    return -1
+
+  def set_timestep(self, t, t2n=None, id2n=None):
     '''
     initialize timestep for each node
     '''
     self.timestep = t 
     if not t2n is None:
       assert self.timestep == len(t2n)
-      t2n.append(self)
+      assert t not in t2n
+      t2n[t] = self
+    if not id2n is None:
+      self.id = t
+      id2n[t] = self
     for c in self.children:
       if hasattr(c, 'set_timestep'):
-        t = c.set_timestep(t+1, t2n)
+        t = c.set_timestep(t+1, t2n, id2n)
     return t
 
-  def _get_data_helper(self, deriv, paren_t):
-    ''' deprecated method '''
-    children = []
-    open_nonterms = []
-    for c in self.children:
-      if type(c) == str or type(c) == unicode:
-        children.append(c)
-      else:
-        children.append(c.label)
-        open_nonterms.append(c.label)
-    #print self
-    #deriv.append(self.label + '|||' + " ".join(children))
-    deriv.append(Rule(self.label, children, open_nonterms))
-    if self.parent():
-      paren_t.append(self.parent().timestep)
+
+class Tree(object):
+  """A class that represents a parse tree"""
+
+  yaml_tag = u"!Tree"
+  def __init__(self, root=None):
+    self.id2n = {}
+    self.t2n = {}
+    self.open_nonterm_ids = []
+    if root:
+      self.root = TreeNode('XXX', [root])
+      self.root.set_timestep(0, self.t2n, self.id2n)
     else:
-      paren_t.append(0)
-    for c in self.children:
-      if hasattr(c, 'get_data'):
-        c.get_data(deriv, paren_t)
+      self.root = TreeNode('XXX', [], id=0, timestep=0)
+      self.id2n[0] = self.root
+      self.root.set_timestep(0, self.t2n)
+      id = self.root.add_child(TreeNode('ROOT', []), self.id2n)
+      if id >= 0:
+        self.open_nonterm_ids.append(id)
+
+  def __str__(self):
+    return str(self.root)
+
+  def copy(self):
+    '''Return a deep copy of the current tree'''
+    copied_tree = Tree()
+    copied_tree.id2n = {}
+    copied_tree.t2n = {}
+    copied_tree.open_nonterm_ids = self.open_nonterm_ids[:]
+
+    root = TreeNode('trash')
+    stack = [self.root]
+    copy_stack = [root]
+    while stack:
+      cur = stack.pop()
+      copy_cur = copy_stack.pop()
+      copy_cur.label = cur.label
+      copy_cur.children = []
+      copy_cur.id = cur.id 
+      copy_cur.timestep = cur.timestep
+
+      copied_tree.id2n[copy_cur.id] = copy_cur
+      if copy_cur.timestep >= 0:
+        copied_tree.t2n[copy_cur.timestep] = copy_cur
+      for c in cur.children:
+        if hasattr(c, 'set_parent'):
+          copy_c = TreeNode(c.label)
+          copy_cur.add_child(copy_c)
+
+          stack.append(c)
+          copy_stack.append(copy_c)
+        else:
+          copy_cur.add_child(c)
+
+    copied_tree.root = root
+    return copied_tree
+
+  def to_sentence(self, piece=False):
+    '''
+    convert subtree into the sentence it represents
+    '''
+    return self.root.to_sentence(piece)
+
+  def add_rule(self, id, rule):
+    ''' Add one node to the tree based on current rule; only called on root tree '''
+    node = self.id2n[id]
+    node.set_timestep(len(self.t2n), self.t2n)
+    assert rule.lhs == node.label, "Rule lhs %s does not match the node %s to be expanded" % (rule.lhs, node.label)
+    new_open_ids = []
+    for rhs in rule.rhs:
+      if rhs in rule.open_nonterms:
+        new_open_ids.append(self.id2n[id].add_child(TreeNode(rhs, []), self.id2n))
+      else:
+        self.id2n[id].add_child(rhs)
+    new_open_ids.reverse()
+    self.open_nonterm_ids.extend(new_open_ids)
+
+  def get_next_open_node(self):
+    if len(self.open_nonterm_ids) == 0:
+      print("stack empty, tree is complete")
+      return -1
+    return self.open_nonterm_ids.pop()
+
+  def get_timestep_data(self, id):
+    ''' Return a list of timesteps data associated with current tree node; only called on root tree '''
+    if self.id2n[id].parent():
+      return [self.id2n[id].parent().timestep]
+    else:
+      return [0]
 
   def get_data_root(self, rule_vocab):
-    self.t2n = []
-    self.set_timestep(0, self.t2n)
     data = []
     for t in xrange(len(self.t2n)):
       node = self.t2n[t]
@@ -449,9 +506,13 @@ class Tree(object):
           children.append(c)
         else:
           children.append(c.label)
+          open_nonterms.append(c.label)
       paren_t = 0 if not node.parent() else node.parent().timestep
       data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t])
     return data
+
+  def query_open_node_label(self):
+    return self.id2n[self.open_nonterm_ids[-1]].label
 
 class TreeReader(BaseTextReader, Serializable):
   """
@@ -469,7 +530,7 @@ class TreeReader(BaseTextReader, Serializable):
     if self.vocab is None:
       self.vocab = RuleVocab()
     for line in self.iterate_filtered(filename, filter_ids):
-      tree = parse_root(tokenize(line))
+      tree = Tree(parse_root(tokenize(line)))
       yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*2 ]) 
 
   def freeze(self):
@@ -506,7 +567,7 @@ def parse_inner(toks):
     if ty == '(':
       children.append(parse_inner(toks))
     elif ty == ')':
-      return Tree(name, children)
+      return TreeNode(name, children)
     else:
       children.append(s)
 
@@ -519,6 +580,45 @@ def parse_root(toks):
   ty, _ = next(toks)
   if ty != '(': raise ParseError
   return parse_inner(toks)
+
+if __name__ == "__main__":
+  # test on copy
+  s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
+  tree = Tree(parse_root(tokenize(s)))
+  print tree 
+  for i, n in tree.id2n.items():
+    print i, str(n)
+
+  cop = tree.copy() 
+  print cop
+  for i, n in cop.id2n.items():
+    print i, str(n)
+  # test on construction
+  tree = Tree()
+  tree.add_rule(tree.get_next_open_node(), Rule('ROOT', ['S'], ['S']))
+  tree.add_rule(tree.get_next_open_node(), Rule('S', ['NP', 'VP', '.'], ['NP', 'VP', '.']))
+  tree.add_rule(tree.get_next_open_node(), Rule('NP', ['NNP'], ['NNP']))
+  copied = tree.copy()
+  tree.add_rule(tree.get_next_open_node(), Rule('NNP', ['I'], []))
+  tree.add_rule(tree.get_next_open_node(), Rule('VP', ['am'], []))
+  tree.add_rule(tree.get_next_open_node(), Rule('.', ['.'], []))
+
+  copied.add_rule(copied.get_next_open_node(), Rule('NNP', ['she'], []))
+  copied.add_rule(copied.get_next_open_node(), Rule('VP', ['is'], []))
+  copied.add_rule(copied.get_next_open_node(), Rule('.', ['.'], []))
+  print tree 
+  print str(tree.open_nonterm_ids)
+  for i, n in tree.id2n.items():
+    print i, str(n)
+  for i, n in tree.t2n.items():
+    print i, str(n)
+  print 
+  print copied
+  print str(copied.open_nonterm_ids)
+  for i, n in copied.id2n.items():
+    print i, str(n), copied.get_timestep_data(i)
+  for i, n in copied.t2n.items():
+    print i, str(n)
 ###### Obsolete Functions
 
 # TODO: The following doesn't follow the current API. If it is necessary, it should be retooled

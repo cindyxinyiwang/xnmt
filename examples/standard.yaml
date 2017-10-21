@@ -8,6 +8,7 @@ defaults:
     run_for_epochs: 20
     eval_metrics: bleu
   train:
+    batch_size: 2
     dropout: 0.1
     default_layer_dim: 512
     restart_trainer: True

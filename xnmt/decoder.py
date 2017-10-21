@@ -1,8 +1,10 @@
 import dynet as dy
+import numpy as np
 from xnmt.serializer import Serializable
 import xnmt.batcher
 from xnmt.hier_model import HierarchicalModel, recursive
 import xnmt.linear
+from input import *
 
 class Decoder(HierarchicalModel):
   '''
@@ -133,10 +135,16 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
 
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
-  def __init__(self, rnn_state=None, context=None, states=None):
+  def __init__(self, rnn_state=None, context=None, states=[], tree=None):
     self.rnn_state = rnn_state
     self.context = context
     self.states = states
+    self.tree = tree
+  def copy(self):
+    if hasattr(self.tree, 'copy'):
+      return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=self.tree.copy())
+    else:
+      return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=tree)
 
 class TreeDecoder(RnnDecoder, Serializable):
   # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
@@ -200,35 +208,60 @@ class TreeDecoder(RnnDecoder, Serializable):
     zeros = dy.zeros(self.lstm_dim + self.input_dim) if self.input_feeding \
       else  dy.zeros(self.lstm_dim)
     rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
-    return TreeDecoderState(rnn_state=rnn_state, context=zeros, states=[rnn_state])
+    return TreeDecoderState(rnn_state=rnn_state, context=zeros, states=np.array([rnn_state.output()]), tree=Tree())
 
-  def add_input(self, tree_dec_state, trg_embedding, trg):
+  def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
     """Add an input and update the state.
 
     :param tree_dec_state: An TreeDecoderState object containing the current state.
     :param trg_embedding: The embedding of the word to input.
     :param trg: The data list of the target word, with the first element as the word index, the rest as timestep.
+    :param trg_rule_vocab: RuleVocab object used at decoding time
     :returns: The update MLP decoder state.
     """
     inp = trg_embedding
     if self.input_feeding:
       inp = dy.concatenate([inp, tree_dec_state.context])
-    if type(trg) == list:
-      inp = dy.concatenate([inp, tree_dec_state.states[trg.get_col(1)]])
-    else:
-      inp = dy.concatenate([inp, dy.zeros(self.lstm_dim)])
-    rnn_state = tree_dec_state.rnn_state.add_input(inp)
-    return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
-                            states=tree_dec_state.states+[rnn_state])
+    if not trg_rule_vocab:
+      # get parent states for this batch
+      batch_size = trg_embedding.dim()[1]
+      paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
+      paren_tm1_list = []
+      for i in range(batch_size):
+        paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
+      paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
 
-  def get_scores(self, tree_dec_state):
+      inp = dy.concatenate([inp, paren_tm1_state])
+
+      rnn_state = tree_dec_state.rnn_state.add_input(inp)
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
+                           states=np.append(tree_dec_state.states, rnn_state.output()) )
+    else:
+      # decoding time
+      lhs_node_id = tree_dec_state.tree.get_next_open_node()
+      rule = trg_rule_vocab[trg]
+      assert tree_dec_state.tree.id2n[lhs_node_id].label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
+      tree_dec_state.tree.add_rule(lhs_node_id, rule)
+      t_data = tree_dec_state.tree.get_timestep_data(lhs_node_id)
+      inp = dy.concatenate([inp, tree_dec_state.states[t_data[0]]])
+      rnn_state = tree_dec_state.rnn_state.add_input(inp)
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
+                            states=np.append(tree_dec_state.states, rnn_state.output()), tree=tree_dec_state.tree)
+
+  def get_scores(self, tree_dec_state, trg_rule_vocab=None):
     """Get scores given a current state.
 
     :param mlp_dec_state: An MlpSoftmaxDecoderState object.
     :returns: Scores over the vocabulary given this state.
     """
     h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
-    return self.vocab_projector(h_t)
+    if not trg_rule_vocab:
+      return self.vocab_projector(h_t)
+    else:
+      valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.tree.query_open_node_label())
+      valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
+      valid_y_mask[valid_y_index] = 0.
+      return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask)
 
   def calc_loss(self, tree_dec_state, ref_action):
     scores = self.get_scores(tree_dec_state)

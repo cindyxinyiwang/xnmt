@@ -56,7 +56,7 @@ class BeamSearch(SearchStrategy):
     def __repr__(self):
       return "hypo S=%s |ids|=%s" % (self.score, len(self.id_list))
 
-  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None):
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None, trg_rule_vocab=None):
     """
     :param decoder: decoder.Decoder subclass
     :param attender: attender.Attender subclass
@@ -64,6 +64,7 @@ class BeamSearch(SearchStrategy):
     :param dec_state: The decoder state
     :param src_length: length of src sequence, required for some types of length normalization
     :param forced_trg_ids: list of word ids, if given will force to generate this is the target sequence
+    :param trg_rule_vocab: RuleVocab object, if given decode with tree decoder
     :returns: (id list, score)
     """
 
@@ -80,12 +81,24 @@ class BeamSearch(SearchStrategy):
 
         dec_state = hyp.state
         if length > 0: # don't feed in the initial start-of-sentence token
-          if hyp.id_list[-1] == Vocab.ES:
-            completed_hyp.append(hyp)
-            continue
-          dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]))
+          if trg_rule_vocab:
+            dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]), hyp.id_list[-1], trg_rule_vocab)
+            if len(dec_state.tree.open_nonterm_ids) == 0:
+              # only know if the stack is empty after we add the current rule back to the tree
+              completed_hyp.append(hyp)
+              continue
+          else:
+            if hyp.id_list[-1] == Vocab.ES:
+              completed_hyp.append(hyp)
+              continue
+            dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]))
         dec_state.context = attender.calc_context(dec_state.rnn_state.output())
-        score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
+        
+        if trg_rule_vocab:
+          # only keep rules with the correct rhs
+          score = dy.log_softmax(decoder.get_scores(dec_state, trg_rule_vocab)).npvalue()
+        else:
+          score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
         if forced_trg_ids is None:
           top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
         else:
@@ -94,9 +107,9 @@ class BeamSearch(SearchStrategy):
         for cur_id in top_ids:
           new_list = list(hyp.id_list)
           new_list.append(cur_id)
-          new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)),
-                                         new_list,
-                                         dec_state))
+          if trg_rule_vocab:
+            dec_state = dec_state.copy()
+          new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
       length += 1
 
       active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:self.beam_size]

@@ -16,6 +16,7 @@ defaults:
     lr_decay: 0.5
     dev_metrics: bleu
     batch_size: 2
+    dev_every: 2
     training_corpus: !BilingualTrainingCorpus
       train_src: examples/data/train.ja
       train_trg: examples/data/train.parse.en

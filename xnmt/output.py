@@ -1,5 +1,6 @@
 import six
-from xnmt.vocab import Vocab
+from xnmt.vocab import Vocab, Rule
+from input import *
 
 class Output(object):
   '''
@@ -36,6 +37,12 @@ class PlainTextOutputProcessor(OutputProcessor):
   def words_to_string(self, word_list):
     return u" ".join(word_list)
 
+class RuleOutputProcessor(PlainTextOutputProcessor):
+  
+  def words_to_string(self, rule_list):
+    tree = Tree.from_rule_deriv(rule_list)
+    return [tree.to_string(), str(tree)]
+
 class JoinedCharTextOutputProcessor(PlainTextOutputProcessor):
   '''
   Assumes a single-character vocabulary and joins them to form words;
@@ -57,3 +64,14 @@ class JoinedBPETextOutputProcessor(PlainTextOutputProcessor):
 
   def words_to_string(self, word_list):
     return u" ".join(word_list).replace(self.merge_indicator_with_space, u"")
+
+class TreeOutputProcessor(PlainTextOutputProcessor):
+  '''
+  Assumes a Rule vocabulary and outputs the merged words;
+  '''
+  def __init__(self, merge_indicator=u"@@"):
+    self.merge_indicator_with_space = merge_indicator + u" "
+
+  def words_to_string(self, word_list):
+    return Tree.from_rule_deriv(word_list).to_string()
+

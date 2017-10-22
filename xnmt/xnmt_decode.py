@@ -78,6 +78,10 @@ def xnmt_decode(args, model_elements=None):
     generator.set_report_resource("src_vocab", src_vocab)
     generator.set_report_resource("trg_vocab", trg_vocab)
 
+  rule_decode = False
+  if hasattr(corpus_parser.trg_reader.vocab, 'rule_index_with_lhs'):
+    rule_decode = True
+    trg_parse = io.open(args.trg_file + ".parse", 'wt', encoding='utf-8')
   # Perform generation of output
   with io.open(args.trg_file, 'wt', encoding='utf-8') as fp:  # Saving the translated output to a trg file
     for i, src in enumerate(src_corpus):
@@ -86,12 +90,17 @@ def xnmt_decode(args, model_elements=None):
         outputs = NO_DECODING_ATTEMPTED
       else:
         dy.renew_cg()
-        if hasattr(corpus_parser.trg_reader.vocab, 'rule_index_with_lhs'):
-          outputs = generator.generate_output(src, i, trg_rule_vocab=trg_vocab)
+        if rule_decode:
+          outputs_list= generator.generate_output(src, i, trg_rule_vocab=trg_vocab)
+          # output both the parse trees and sentence
+          outputs, tree = outputs_list[0], outputs_list[1]
+          trg_parse.write(u"{}\n".format(tree))
         else:
           outputs = generator.generate_output(src, i)
       # Printing to trg file
       fp.write(u"{}\n".format(outputs))
+  if rule_decode:
+    trg_parse.close()
 
 def output_processor_for_spec(spec):
   if spec == "none":
@@ -100,6 +109,8 @@ def output_processor_for_spec(spec):
     return JoinedCharTextOutputProcessor()
   elif spec == "join-bpe":
     return JoinedBPETextOutputProcessor()
+  elif spec == "rule":
+    return RuleOutputProcessor()
   else:
     raise RuntimeError("Unknown postprocessing argument {}".format(spec))
 

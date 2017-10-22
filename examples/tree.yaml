@@ -37,10 +37,11 @@ defaults:
         bridge: !CopyBridge {}
   decode:
     beam: 5
+    post_process: rule
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
     src_file: examples/data/test.ja
   evaluate:
     ref_file: examples/data/test.en
 
-standard:
+tree:

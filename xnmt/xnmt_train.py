@@ -275,7 +275,9 @@ class XnmtTrainer(object):
       processed = []
       with io.open(self.training_corpus.dev_trg, encoding=encoding) as fin:
         for line in fin:
-          processed.append(output_processor.words_to_string(line.strip().split()) + u"\n")
+          out = output_processor.words_to_string(line.strip().split()) 
+          out = out[0] if type(out) == list else out
+          processed.append(out + u"\n")
       with io.open(out_file_ref, 'wt', encoding=encoding) as fout:
         for line in processed:
           fout.write(line)

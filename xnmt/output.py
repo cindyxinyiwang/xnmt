@@ -41,7 +41,7 @@ class RuleOutputProcessor(PlainTextOutputProcessor):
   
   def words_to_string(self, rule_list):
     tree = Tree.from_rule_deriv(rule_list)
-    return [tree.to_string(), str(tree)]
+    return [tree.to_string(), tree.to_parse_string()]
 
 class JoinedCharTextOutputProcessor(PlainTextOutputProcessor):
   '''

@@ -99,6 +99,7 @@ class InputReader(object):
 class BaseTextReader(InputReader):
   def count_sents(self, filename):
     i = 0
+    filename = filename.split(',')[0]
     with io.open(filename, encoding='utf-8') as f:
       for _ in f:
         i+=1
@@ -308,252 +309,11 @@ class TreeInput(Input):
     if pad_len == 0:
       return self
     new_words = list(self.words)
-    new_words.extend([[token]*2 ] * pad_len)
+    new_words.extend([[token]*3 ] * pad_len)
     return TreeInput(new_words)
 
   def __str__(self):
     return " ".join(six.moves.map(str, self.words))
-
-class TreeNode(object):
-  """A class that represents a tree node object """
-  def __init__(self, string, children=[], timestep=-1, id=-1):
-    self.label = string 
-    self.children = children
-    for c in children:
-      if hasattr(c, "set_parent"):
-        c.set_parent(self)
-    self._parent = None 
-    self.timestep = timestep
-    self.id = id 
-
-  def __str__(self):
-    c_str = []
-    stack = [self]
-    add_paren_len = [0]
-    while stack:
-      while add_paren_len[-1] == len(stack):
-        assert len(c_str) > 0
-        add_paren_len.pop()
-        c_str[-1] += u')'
-      cur= stack.pop()
-      c_str.append(u'(' + cur.label)
-      for c in reversed(cur.children):
-        if type(c) == str or type(c) == unicode:
-          c_str.append(c)
-        else:
-          stack.append(c)
-          add_paren_len.append(len(stack)-1)
-    c_str[-1] += u')' * len(add_paren_len)
-    return u" ".join(c_str)
-
-  def to_string(self, piece=False):
-    '''
-    convert subtree into the sentence it represents
-    '''
-    toks = []
-    
-    stack = [self]
-    add_space_len = []
-    while stack:
-      #sub_word = True
-      init_stack_len = len(stack)
-      if add_space_len and add_space_len[-1] == len(stack):
-        toks.append(" ")
-        add_space_len.pop()
-      cur = stack.pop()
-      for c in reversed(cur.children):
-        if type(c) == str or type(c) == unicode:
-          toks.append(c)
-        else:
-          stack.append(c)
-      if not "_sub" in cur.label and not piece:
-        add_space_len.append(init_stack_len-1)
-    if not piece:
-      return u"".join(toks)
-    else:
-      return u" ".join(toks)
-
-  def parent(self):
-    return self._parent
-
-  def set_parent(self, new_parent):
-    self._parent = new_parent
-
-  def add_child(self, child, id2n=None):
-    self.children.append(child)
-    if hasattr(child, "set_parent"):
-      child.set_parent(self)
-      if id2n:
-        child.id = len(id2n)
-        id2n[child.id] = child
-        return child.id 
-    return -1
-
-  def set_timestep(self, t, t2n=None, id2n=None):
-    '''
-    initialize timestep for each node
-    '''
-    self.timestep = t 
-    if not t2n is None:
-      assert self.timestep == len(t2n)
-      assert t not in t2n
-      t2n[t] = self
-    if not id2n is None:
-      self.id = t
-      id2n[t] = self
-    for c in self.children:
-      if hasattr(c, 'set_timestep'):
-        t = c.set_timestep(t+1, t2n, id2n)
-    return t
-
-
-class Tree(object):
-  """A class that represents a parse tree"""
-
-  yaml_tag = u"!Tree"
-  def __init__(self, root=None, sent_piece=None, binarize=False):
-    self.id2n = {}
-    self.t2n = {}
-    self.open_nonterm_ids = []
-    if root:
-      self.root = TreeNode(u'XXX', [root])
-      if sent_piece:
-        split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
-      if binarize:
-        self.root = right_binarize(self.root)
-      self.root.set_timestep(0, self.t2n, self.id2n)
-    else:
-      self.root = TreeNode(u'XXX', [], id=0, timestep=0)
-      self.id2n[0] = self.root
-      self.root.set_timestep(0, self.t2n)
-      id = self.root.add_child(TreeNode(u'ROOT', []), self.id2n)
-      if id >= 0:
-        self.open_nonterm_ids.append(id)
-
-  def __str__(self):
-    return str(self.root)
-
-  def copy(self):
-    '''Return a deep copy of the current tree'''
-    copied_tree = Tree()
-    copied_tree.id2n = {}
-    copied_tree.t2n = {}
-    copied_tree.open_nonterm_ids = self.open_nonterm_ids[:]
-
-    root = TreeNode(u'trash')
-    stack = [self.root]
-    copy_stack = [root]
-    while stack:
-      cur = stack.pop()
-      copy_cur = copy_stack.pop()
-      copy_cur.label = cur.label
-      copy_cur.children = []
-      copy_cur.id = cur.id 
-      copy_cur.timestep = cur.timestep
-
-      copied_tree.id2n[copy_cur.id] = copy_cur
-      if copy_cur.timestep >= 0:
-        copied_tree.t2n[copy_cur.timestep] = copy_cur
-      for c in cur.children:
-        if hasattr(c, 'set_parent'):
-          copy_c = TreeNode(c.label)
-          copy_cur.add_child(copy_c)
-
-          stack.append(c)
-          copy_stack.append(copy_c)
-        else:
-          copy_cur.add_child(c)
-
-    copied_tree.root = root
-    return copied_tree
-
-  @classmethod
-  def from_rule_deriv(cls, derivs):
-    tree = Tree()
-    #tree.id2n = {}
-    #tree.t2n = {}
-    #tree.open_nonterm_ids = []
-    #r0 = derivs[0]
-    #tree.root = TreeNode(r0.lhs, [child for child in r0.rhs if not child in r0.open_nonterms ])
-    #if len(r0.open_nonterms) == 0:
-      #assert len(derivs) == 1
-    #  return tree
-
-    stack_tree = [ tree.root ]
-    stack_children_left = [1]
-
-    for r in derivs:
-      p_tree, p_children_left = stack_tree.pop(), stack_children_left.pop()
-
-      new_tree = TreeNode(r.lhs, [child for child in r.rhs if not child in r.open_nonterms])
-      p_tree.add_child(new_tree, tree.id2n)
-      new_tree._parent = p_tree
-      p_children_left -= 1
-
-      if p_children_left > 0:
-        stack_tree.append(p_tree)
-        stack_children_left.append(p_children_left)
-
-      if len(r.open_nonterms) > 0:
-        stack_tree.append(new_tree)
-        stack_children_left.append(len(r.open_nonterms))
-    # if there is no available translation, the rules on deriv stack won't be consumed up
-    #assert len(stack_children_left) == len(stack_tree) == 0
-    #if len(stack_children_left) != 0 or len(stack_tree) != 0:
-    # for d in derivs:
-    #   print str(d)
-    return tree
-
-  def to_string(self, piece=False):
-    '''
-    convert subtree into the sentence it represents
-    '''
-    return self.root.to_string(piece)
-
-  def add_rule(self, id, rule):
-    ''' Add one node to the tree based on current rule; only called on root tree '''
-    node = self.id2n[id]
-    node.set_timestep(len(self.t2n), self.t2n)
-    assert rule.lhs == node.label, "Rule lhs %s does not match the node %s to be expanded" % (rule.lhs, node.label)
-    new_open_ids = []
-    for rhs in rule.rhs:
-      if rhs in rule.open_nonterms:
-        new_open_ids.append(self.id2n[id].add_child(TreeNode(rhs, []), self.id2n))
-      else:
-        self.id2n[id].add_child(rhs)
-    new_open_ids.reverse()
-    self.open_nonterm_ids.extend(new_open_ids)
-
-  def get_next_open_node(self):
-    if len(self.open_nonterm_ids) == 0:
-      print("stack empty, tree is complete")
-      return -1
-    return self.open_nonterm_ids.pop()
-
-  def get_timestep_data(self, id):
-    ''' Return a list of timesteps data associated with current tree node; only called on root tree '''
-    if self.id2n[id].parent():
-      return [self.id2n[id].parent().timestep]
-    else:
-      return [0]
-
-  def get_data_root(self, rule_vocab):
-    data = []
-    for t in xrange(len(self.t2n)):
-      node = self.t2n[t]
-      children, open_nonterms = [], []
-      for c in node.children:
-        if type(c) == str or type(c) == unicode:
-          children.append(c)
-        else:
-          children.append(c.label)
-          open_nonterms.append(c.label)
-      paren_t = 0 if not node.parent() else node.parent().timestep
-      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t])
-    return data
-
-  def query_open_node_label(self):
-    return self.id2n[self.open_nonterm_ids[-1]].label
 
 class TreeReader(BaseTextReader, Serializable):
   """
@@ -561,9 +321,8 @@ class TreeReader(BaseTextReader, Serializable):
   parse tree. The vocab object has to be a RuleVocab
   """
   yaml_tag = u'!TreeReader'
-  def __init__(self, vocab=None, sent_piece_file=None):
+  def __init__(self, vocab=None):
     self.vocab = vocab
-    self.sent_piece_file = sent_piece_file
     if vocab is not None:
       self.vocab.freeze()
       self.vocab.set_unk(Vocab.UNK_STR)
@@ -571,14 +330,15 @@ class TreeReader(BaseTextReader, Serializable):
   def read_sents(self, filename, filter_ids=None):
     if self.vocab is None:
       self.vocab = RuleVocab()
-    if self.sent_piece_file:
-      piece_file = open(sent_piece_file, 'r')
-      for line, sent_piece in self.iterate_filtered_double(filename, self.sent_piece_file, filter_ids):
+    filename = filename.split(',')
+    if len(filename) > 1:
+      for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
         tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=True)
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*3 ]) 
     else:
-      for line in self.iterate_filtered(filename, filter_ids):
+      for line in self.iterate_filtered(filename[0], filter_ids):
         tree = Tree(parse_root(tokenize(line)))
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*2 ]) 
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*3 ]) 
 
   def freeze(self):
     self.vocab.freeze()
@@ -608,6 +368,265 @@ class TreeReader(BaseTextReader, Serializable):
           if max_id is not None and sent_count > max_id:
             break
 
+class TreeNode(object):
+  """A class that represents a tree node object """
+  def __init__(self, string, children=[], timestep=-1, id=-1, last_word_t=0):
+    self.label = string 
+    self.children = children
+    for c in children:
+      if hasattr(c, "set_parent"):
+        c.set_parent(self)
+    self._parent = None 
+    self.timestep = timestep
+    self.id = id 
+    self.last_word_t = last_word_t
+
+  def to_parse_string(self):
+    c_str = []
+    stack = [self]
+    add_paren_len = [0]
+    while stack:
+      while add_paren_len[-1] == len(stack):
+        assert len(c_str) > 0
+        add_paren_len.pop()
+        c_str[-1] += u')'
+      cur= stack.pop()
+      c_str.append(u'(' + cur.label)
+      for c in reversed(cur.children):
+        if type(c) == str or type(c) == unicode:
+          c_str.append(c)
+        else:
+          stack.append(c)
+          add_paren_len.append(len(stack)-1)
+    c_str[-1] += u')' * len(add_paren_len)
+    return u" ".join(c_str)
+
+  def to_string(self, piece=True):
+    '''
+    convert subtree into the sentence it represents
+    '''
+    toks = []
+    
+    stack = [self]
+    add_space_len = []
+    while stack:
+      #sub_word = True
+      init_stack_len = len(stack)
+      if add_space_len and add_space_len[-1] == len(stack):
+        toks.append(u" ")
+        add_space_len.pop()
+      cur = stack.pop()
+      for c in reversed(cur.children):
+        if type(c) == str or type(c) == unicode:
+          toks.append(c)
+        else:
+          stack.append(c)
+      if not "_sub" in cur.label and not piece:
+        add_space_len.append(init_stack_len-1)
+    if not piece:
+      return u"".join(toks)
+    else:
+      return u"".join(toks).replace(u'\u2581', u' ')
+
+  def parent(self):
+    return self._parent
+
+  def set_parent(self, new_parent):
+    self._parent = new_parent
+
+  def add_child(self, child, id2n=None, last_word_t=0):
+    self.children.append(child)
+    if hasattr(child, "set_parent"):
+      child.set_parent(self)
+      child.last_word_t = last_word_t
+      if id2n:
+        child.id = len(id2n)
+        id2n[child.id] = child
+        return child.id 
+    return -1
+
+  def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0):
+    '''
+    initialize timestep for each node
+    '''
+    self.timestep = t 
+    self.last_word_t = last_word_t
+    next_word_t = last_word_t
+    if not t2n is None:
+      assert self.timestep == len(t2n)
+      assert t not in t2n
+      t2n[t] = self
+    if not id2n is None:
+      self.id = t
+      id2n[t] = self
+    for c in self.children:
+      if hasattr(c, 'set_timestep'):
+        t, next_word_t = c.set_timestep(t+1, t2n, id2n, next_word_t)
+      else:
+        next_word_t = t
+    return t, next_word_t
+
+
+class Tree(object):
+  """A class that represents a parse tree"""
+
+  yaml_tag = u"!Tree"
+  def __init__(self, root=None, sent_piece=None, binarize=False):
+    self.id2n = {}
+    self.t2n = {}
+    self.open_nonterm_ids = []
+    self.last_word_t = -1
+    if root:
+      self.root = TreeNode(u'XXX', [root])
+      if sent_piece:
+        split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
+      if binarize:
+        self.root = right_binarize(self.root)
+      self.root.set_timestep(0, self.t2n, self.id2n)
+    else:
+      self.last_word_t = 0
+      self.root = TreeNode(u'XXX', [], id=0, timestep=0)
+      self.id2n[0] = self.root
+      self.root.set_timestep(0, self.t2n)
+      id = self.root.add_child(TreeNode(u'ROOT', []), self.id2n)
+      if id >= 0:
+        self.open_nonterm_ids.append(id)
+
+  def __str__(self):
+    return self.root.to_parse_string()
+
+  def to_parse_string(self):
+    return self.root.to_parse_string()
+
+  def copy(self):
+    '''Return a deep copy of the current tree'''
+    copied_tree = Tree()
+    copied_tree.id2n = {}
+    copied_tree.t2n = {}
+    copied_tree.open_nonterm_ids = self.open_nonterm_ids[:]
+    copied_tree.last_word_t = self.last_word_t
+
+    root = TreeNode(u'trash')
+    stack = [self.root]
+    copy_stack = [root]
+    while stack:
+      cur = stack.pop()
+      copy_cur = copy_stack.pop()
+      copy_cur.label = cur.label
+      copy_cur.children = []
+      copy_cur.id = cur.id 
+      copy_cur.timestep = cur.timestep
+      copy_cur.last_word_t = cur.last_word_t
+
+      copied_tree.id2n[copy_cur.id] = copy_cur
+      if copy_cur.timestep >= 0:
+        copied_tree.t2n[copy_cur.timestep] = copy_cur
+      for c in cur.children:
+        if hasattr(c, 'set_parent'):
+          copy_c = TreeNode(c.label)
+          copy_cur.add_child(copy_c)
+
+          stack.append(c)
+          copy_stack.append(copy_c)
+        else:
+          copy_cur.add_child(c)
+
+    copied_tree.root = root
+    return copied_tree
+
+  @classmethod
+  def from_rule_deriv(cls, derivs):
+    tree = Tree()
+    #tree.id2n = {}
+    #tree.t2n = {}
+    #tree.open_nonterm_ids = []
+    #r0 = derivs[0]
+    #tree.root = TreeNode(r0.lhs, [child for child in r0.rhs if not child in r0.open_nonterms ])
+    #if len(r0.open_nonterms) == 0:
+      #assert len(derivs) == 1
+    #  return tree
+
+    stack_tree = [ tree.root.children[0] ]
+    stack_children_left = [1]
+
+    for r in derivs:
+      p_tree, p_children_left = stack_tree.pop(), stack_children_left.pop()
+
+      new_tree = TreeNode(r.lhs, [child for child in r.rhs if not child in r.open_nonterms])
+      p_tree.add_child(new_tree, tree.id2n)
+      new_tree._parent = p_tree
+      p_children_left -= 1
+
+      if p_children_left > 0:
+        stack_tree.append(p_tree)
+        stack_children_left.append(p_children_left)
+
+      if len(r.open_nonterms) > 0:
+        stack_tree.append(new_tree)
+        stack_children_left.append(len(r.open_nonterms))
+    # if there is no available translation, the rules on deriv stack won't be consumed up
+    #assert len(stack_children_left) == len(stack_tree) == 0
+    #if len(stack_children_left) != 0 or len(stack_tree) != 0:
+    # for d in derivs:
+    #   print str(d)
+    return tree
+
+  def to_string(self, piece=True):
+    '''
+    convert subtree into the sentence it represents
+    '''
+    return self.root.to_string(piece)
+
+  def add_rule(self, id, rule):
+    ''' Add one node to the tree based on current rule; only called on root tree '''
+    node = self.id2n[id]
+    node.set_timestep(len(self.t2n), self.t2n)
+    node.last_word_t = self.last_word_t
+    assert rule.lhs == node.label, "Rule lhs %s does not match the node %s to be expanded" % (rule.lhs, node.label)
+    new_open_ids = []
+    for rhs in rule.rhs:
+      if rhs in rule.open_nonterms:
+        new_open_ids.append(self.id2n[id].add_child(TreeNode(rhs, []), self.id2n))
+      else:
+        self.id2n[id].add_child(rhs)
+        self.last_word_t = node.timestep
+    new_open_ids.reverse()
+    self.open_nonterm_ids.extend(new_open_ids)
+
+  def get_next_open_node(self):
+    if len(self.open_nonterm_ids) == 0:
+      print("stack empty, tree is complete")
+      return -1
+    return self.open_nonterm_ids.pop()
+
+  def get_timestep_data(self, id):
+    ''' Return a list of timesteps data associated with current tree node; only called on root tree '''
+    data = []
+    if self.id2n[id].parent():
+      data.append(self.id2n[id].parent().timestep)
+    else:
+      data.append(0)
+    data.append(self.id2n[id].last_word_t)
+    return data
+
+  def get_data_root(self, rule_vocab):
+    data = []
+    for t in xrange(len(self.t2n)):
+      node = self.t2n[t]
+      children, open_nonterms = [], []
+      for c in node.children:
+        if type(c) == str or type(c) == unicode:
+          children.append(c)
+        else:
+          children.append(c.label)
+          open_nonterms.append(c.label)
+      paren_t = 0 if not node.parent() else node.parent().timestep
+      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t, node.last_word_t])
+    return data
+
+  def query_open_node_label(self):
+    return self.id2n[self.open_nonterm_ids[-1]].label
+
 def sent_piece_segs(p):
   '''
   Segment a sentence piece string into list of piece string for each word
@@ -615,7 +634,7 @@ def sent_piece_segs(p):
   #print p
   #print p.split()
   #toks = re.compile(ur'\xe2\x96\x81[^(\xe2\x96\x81)]+')
-  toks = re.compile(ur'\xe2\x96\x81')
+  toks = re.compile(ur'\u2581')
   ret = []
   p_start = 0
   for m in toks.finditer(p):
@@ -634,7 +653,7 @@ def split_sent_piece(root, piece_l, word_idx):
   '''
   new_children = []
   for i, c in enumerate(root.children):
-    if type(c) == str:
+    if type(c) == str or type(c) == unicode:
       # find number of empty space in c
       #space_c = len(c.decode('utf-8').split()) - 1
       #piece = []
@@ -643,17 +662,17 @@ def split_sent_piece(root, piece_l, word_idx):
       #word_idx += (space_c + 1)
       piece = piece_l[word_idx].split()
       word_idx += 1 
-      if "".join(piece) != '\xe2\x96\x81'+c and c != '-LRB-' and c != '-RRB-':
+      if u"".join(piece) != u'\u2581'+c and c != '-LRB-' and c != '-RRB-':
         print c.decode('utf-8').split()
         print piece
       if len(piece) == 1:
-        n = TreeNode('x', piece)
+        n = TreeNode(u'x', piece)
         n._parent = root
         new_children.append(n)
         continue
       for p in piece:
-        n = TreeNode('x', [p])
-        r = TreeNode(root.label + "_sub", [n])
+        n = TreeNode(u'x', [p])
+        r = TreeNode(root.label + u"_sub", [n])
         r._parent = root 
         new_children.append(r)
     else:
@@ -666,7 +685,7 @@ def right_binarize(root):
   '''
   Right binarize a CusTree object
   '''
-  if type(root) == str:
+  if type(root) == str or type(root) == unicode:
     return root 
   if len(root.children) <= 2:
     new_children = []
@@ -730,16 +749,19 @@ def parse_root(toks):
 
 if __name__ == "__main__":
   # test on copy
+  '''
   s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
   tree = Tree(parse_root(tokenize(s)))
   print tree 
   for i, n in tree.id2n.items():
-    print i, str(n)
+    print i, str(n), n.last_word_t
 
   cop = tree.copy() 
   print cop
   for i, n in cop.id2n.items():
-    print i, str(n)
+    print i, n.to_parse_string(), n.last_word_t
+  '''
+
   # test on construction
   tree = Tree()
   tree.add_rule(tree.get_next_open_node(), Rule('ROOT', ['S'], ['S']))
@@ -749,23 +771,30 @@ if __name__ == "__main__":
   tree.add_rule(tree.get_next_open_node(), Rule('NNP', ['I'], []))
   tree.add_rule(tree.get_next_open_node(), Rule('VP', ['am'], []))
   tree.add_rule(tree.get_next_open_node(), Rule('.', ['.'], []))
+  #tree = right_binarize(tree)
+  print tree 
+  print str(tree.open_nonterm_ids)
+  for i, n in tree.id2n.items():
+    print i, n.to_parse_string(), n.last_word_t
+  for i, n in tree.t2n.items():
+    print i, n.to_parse_string(), n.last_word_t
+  print tree.get_data_root(RuleVocab())
+
 
   copied.add_rule(copied.get_next_open_node(), Rule('NNP', ['she'], []))
   copied.add_rule(copied.get_next_open_node(), Rule('VP', ['is'], []))
   copied.add_rule(copied.get_next_open_node(), Rule('.', ['.'], []))
-  print tree 
-  print str(tree.open_nonterm_ids)
-  for i, n in tree.id2n.items():
-    print i, str(n)
-  for i, n in tree.t2n.items():
-    print i, str(n)
+  
   print 
-  print copied
+  print copied.to_parse_string()
   print str(copied.open_nonterm_ids)
   for i, n in copied.id2n.items():
-    print i, str(n), copied.get_timestep_data(i)
+    print i, n.to_parse_string(), copied.get_timestep_data(i)
   for i, n in copied.t2n.items():
-    print i, str(n)
+    print i, n.to_parse_string(), n.last_word_t
+
+
+  
   print
   rules = [Rule('ROOT', ['S'], ['S']), Rule('S', ['NP', 'VP', '.'], ['NP', 'VP', '.']), Rule('NP', ['NNP'], ['NNP']), \
           Rule('NNP', ['I'], []), Rule('VP', ['am'], []), Rule('.', ['.'], [])]
@@ -780,6 +809,7 @@ if __name__ == "__main__":
   r = Rule('ROOT', ['S'], ['S'])
   print isinstance(r, Rule)
   print u"{}\n".format(r)
+
 ###### Obsolete Functions
 
 # TODO: The following doesn't follow the current API. If it is necessary, it should be retooled

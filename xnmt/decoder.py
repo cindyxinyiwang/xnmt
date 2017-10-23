@@ -170,8 +170,10 @@ class TreeDecoder(RnnDecoder, Serializable):
     lstm_input = trg_embed_dim
     if input_feeding:
       lstm_input += input_dim
-    # parent state
-    lstm_input += lstm_dim
+    # parent state + last_word_state
+    lstm_input += lstm_dim * 2
+
+    self.init_lstm_dim = lstm_input - trg_embed_dim
     # Bridge
     self.lstm_layers = layers
     self.bridge = bridge or NoBridge(context, self.lstm_layers, self.lstm_dim)
@@ -205,8 +207,9 @@ class TreeDecoder(RnnDecoder, Serializable):
     """
     rnn_state = self.fwd_lstm.initial_state()
     rnn_state = rnn_state.set_s(self.bridge.decoder_init(enc_final_states))
-    zeros = dy.zeros(self.lstm_dim + self.input_dim) if self.input_feeding \
-      else  dy.zeros(self.lstm_dim)
+    #zeros = dy.zeros(self.lstm_dim + self.input_dim) if self.input_feeding \
+    #  else  dy.zeros(self.lstm_dim)
+    zeros = dy.zeros(self.init_lstm_dim)
     rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
     return TreeDecoderState(rnn_state=rnn_state, context=zeros, states=np.array([rnn_state.output()]), tree=Tree())
 
@@ -226,16 +229,20 @@ class TreeDecoder(RnnDecoder, Serializable):
       # get parent states for this batch
       batch_size = trg_embedding.dim()[1]
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
+      last_word_states = tree_dec_state.states[trg.get_col(2)]
       paren_tm1_list = []
+      last_word_list = []
       for i in range(batch_size):
         paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
+        last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
       paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
+      last_word_state = dy.concatenate_to_batch(last_word_list)
 
-      inp = dy.concatenate([inp, paren_tm1_state])
+      inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
-                           states=np.append(tree_dec_state.states, rnn_state.output()) )
+                           states=np.append(tree_dec_state.states, rnn_state.output()), tree=Tree())
     else:
       # decoding time
       lhs_node_id = tree_dec_state.tree.get_next_open_node()
@@ -243,7 +250,8 @@ class TreeDecoder(RnnDecoder, Serializable):
       assert tree_dec_state.tree.id2n[lhs_node_id].label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
       tree_dec_state.tree.add_rule(lhs_node_id, rule)
       t_data = tree_dec_state.tree.get_timestep_data(lhs_node_id)
-      inp = dy.concatenate([inp, tree_dec_state.states[t_data[0]]])
+
+      inp = dy.concatenate([inp] + tree_dec_state.states[t_data].tolist())
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
                             states=np.append(tree_dec_state.states, rnn_state.output()), tree=tree_dec_state.tree)

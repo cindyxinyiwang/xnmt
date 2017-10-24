@@ -96,11 +96,14 @@ class BeamSearch(SearchStrategy):
         
         if trg_rule_vocab:
           # only keep rules with the correct rhs
-          score = dy.log_softmax(decoder.get_scores(dec_state, trg_rule_vocab)).npvalue()
+          score, num_valid_rule = dy.log_softmax(decoder.get_scores(dec_state, trg_rule_vocab)).npvalue()
         else:
           score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
         if forced_trg_ids is None:
-          top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
+          if trg_rule_vocab:
+            top_ids = np.argpartition(score, max(-num_valid_rule,-self.beam_size))[-min(self.beam_size, num_valid_rule):]
+          else:
+            top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
         else:
           top_ids = [forced_trg_ids[length]]
 
@@ -112,8 +115,11 @@ class BeamSearch(SearchStrategy):
           else:
             new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
       length += 1
-
-      active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:self.beam_size]
+      
+      if trg_rule_vocab:
+        active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:min(self.beam_size, num_valid_rule)]
+      else:
+        active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:self.beam_size]
 
     if len(completed_hyp) == 0:
       completed_hyp = active_hyp

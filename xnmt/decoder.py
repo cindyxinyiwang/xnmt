@@ -283,7 +283,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       # decoding time
       cur_nonterm = tree_dec_state.open_nonterms.pop()
       rule = trg_rule_vocab[trg]
-      assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
+      assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
       # add rule to tree_dec_state.open_nonterms
       new_open_nonterms = []
       for rhs in rule.rhs:
@@ -312,7 +312,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
       valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
       valid_y_mask[valid_y_index] = 0.
-      return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask)
+      return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index)
 
   def calc_loss(self, tree_dec_state, ref_action):
     scores = self.get_scores(tree_dec_state)

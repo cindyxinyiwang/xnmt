@@ -133,18 +133,36 @@ class MlpSoftmaxDecoder(RnnDecoder, Serializable):
   def set_train(self, val):
     self.fwd_lstm.set_dropout(self.dropout if val else 0.0)
 
+class OpenNonterm:
+  def __init__(self, label=None, parent_state=None):
+    self.label = label 
+    self.parent_state = parent_state
+
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
-  def __init__(self, rnn_state=None, context=None, states=[], tree=None):
+  def __init__(self, rnn_state=None, context=None, states=[], tree=None, open_nonterms=[], prev_word_state=None):
     self.rnn_state = rnn_state
     self.context = context
+    # training time
     self.states = states
     self.tree = tree
+
+    #used at decoding time
+    self.open_nonterms = open_nonterms
+    self.prev_word_state = prev_word_state
+
   def copy(self):
-    if hasattr(self.tree, 'copy'):
-      return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=self.tree.copy())
-    else:
-      return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=tree)
+    #open_nonterms_copy = []
+    #for n in self.open_nonterms:
+    #  open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state))
+
+    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=self.states[:], tree=self.tree, \
+                            open_nonterms=self.open_nonterms[:], prev_word_state=self.prev_word_state)
+  #def copy(self):
+  #  if hasattr(self.tree, 'copy'):
+  #    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=self.tree.copy())
+  #  else:
+  #    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=np.array(self.states), tree=tree)
 
 class TreeDecoder(RnnDecoder, Serializable):
   # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
@@ -199,7 +217,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     return [set(["layers", "bridge.dec_layers"]),
             set(["lstm_dim", "bridge.dec_dim"])]
 
-  def initial_state(self, enc_final_states, ss_expr):
+  def initial_state(self, enc_final_states, ss_expr, decoding=False):
     """Get the initial state of the decoder given the encoder final states.
 
     :param enc_final_states: The encoder final states.
@@ -211,7 +229,14 @@ class TreeDecoder(RnnDecoder, Serializable):
     #  else  dy.zeros(self.lstm_dim)
     zeros = dy.zeros(self.init_lstm_dim)
     rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
-    return TreeDecoderState(rnn_state=rnn_state, context=zeros, states=np.array([rnn_state.output()]), tree=Tree())
+    if decoding:
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, \
+          open_nonterms=[OpenNonterm('ROOT', parent_state=dy.zeros(self.lstm_dim))], \
+          prev_word_state=dy.zeros(self.lstm_dim))
+    else:
+      batch_size = ss_expr.dim()[1]
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, \
+              states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]), tree=Tree())
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
     """Add an input and update the state.
@@ -245,16 +270,33 @@ class TreeDecoder(RnnDecoder, Serializable):
                            states=np.append(tree_dec_state.states, rnn_state.output()), tree=Tree())
     else:
       # decoding time
-      lhs_node_id = tree_dec_state.tree.get_next_open_node()
-      rule = trg_rule_vocab[trg]
-      assert tree_dec_state.tree.id2n[lhs_node_id].label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
-      tree_dec_state.tree.add_rule(lhs_node_id, rule)
-      t_data = tree_dec_state.tree.get_timestep_data(lhs_node_id)
+      #lhs_node_id = tree_dec_state.tree.get_next_open_node()
+      #rule = trg_rule_vocab[trg]
+      #assert tree_dec_state.tree.id2n[lhs_node_id].label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
+      #tree_dec_state.tree.add_rule(lhs_node_id, rule)
+      #t_data = tree_dec_state.tree.get_timestep_data(lhs_node_id)
 
-      inp = dy.concatenate([inp] + tree_dec_state.states[t_data].tolist())
-      rnn_state = tree_dec_state.rnn_state.add_input(inp)
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
-                            states=np.append(tree_dec_state.states, rnn_state.output()), tree=tree_dec_state.tree)
+      #inp = dy.concatenate([inp] + tree_dec_state.states[t_data].tolist())
+      #rnn_state = tree_dec_state.rnn_state.add_input(inp)
+      #return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
+      #                      states=np.append(tree_dec_state.states, rnn_state.output()), tree=tree_dec_state.tree)
+      # decoding time
+      cur_nonterm = tree_dec_state.open_nonterms.pop()
+      rule = trg_rule_vocab[trg]
+      assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, lhs_tree_node.label)
+      # add rule to tree_dec_state.open_nonterms
+      new_open_nonterms = []
+      for rhs in rule.rhs:
+        if rhs in rule.open_nonterms:
+          new_open_nonterms.append(OpenNonterm(rhs, parent_state=tree_dec_state.rnn_state.output()))
+        else:
+          tree_dec_state.prev_word_state = tree_dec_state.rnn_state.output()
+      new_open_nonterms.reverse()
+      tree_dec_state.open_nonterms.extend(new_open_nonterms)
+
+      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+      tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)
+      return tree_dec_state
 
   def get_scores(self, tree_dec_state, trg_rule_vocab=None):
     """Get scores given a current state.
@@ -266,7 +308,8 @@ class TreeDecoder(RnnDecoder, Serializable):
     if not trg_rule_vocab:
       return self.vocab_projector(h_t)
     else:
-      valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.tree.query_open_node_label())
+      #valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.tree.query_open_node_label())
+      valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
       valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
       valid_y_mask[valid_y_index] = 0.
       return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask)

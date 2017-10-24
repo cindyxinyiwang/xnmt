@@ -83,7 +83,7 @@ class BeamSearch(SearchStrategy):
         if length > 0: # don't feed in the initial start-of-sentence token
           if trg_rule_vocab:
             dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]), hyp.id_list[-1], trg_rule_vocab)
-            if len(dec_state.tree.open_nonterm_ids) == 0:
+            if len(dec_state.open_nonterms) == 0:
               # only know if the stack is empty after we add the current rule back to the tree
               completed_hyp.append(hyp)
               continue
@@ -108,8 +108,9 @@ class BeamSearch(SearchStrategy):
           new_list = list(hyp.id_list)
           new_list.append(cur_id)
           if trg_rule_vocab:
-            dec_state = dec_state.copy()
-          new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
+            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state.copy()))
+          else:
+            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
       length += 1
 
       active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:self.beam_size]

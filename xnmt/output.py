@@ -75,3 +75,24 @@ class TreeOutputProcessor(PlainTextOutputProcessor):
   def words_to_string(self, word_list):
     return Tree.from_rule_deriv(word_list).to_string()
 
+class JoinedBPETextOutputProcessor(PlainTextOutputProcessor):
+  '''
+  Assumes a bpe-based vocabulary and outputs the merged words;
+  per default, the '@' postfix indicates subwords that should be merged
+  '''
+  def __init__(self, merge_indicator=u"@@"):
+    self.merge_indicator_with_space = merge_indicator + u" "
+
+  def words_to_string(self, word_list):
+    return u" ".join(word_list).replace(self.merge_indicator_with_space, u"")
+
+class JoinedPieceTextOutputProcessor(PlainTextOutputProcessor):
+  '''
+  Assumes a bpe-based vocabulary and outputs the merged words;
+  per default, the '@' postfix indicates subwords that should be merged
+  '''
+  def __init__(self, merge_indicator=u"\u2581"):
+    self.merge_indicator = merge_indicator
+
+  def words_to_string(self, word_list):
+    return u"".join(word_list).replace(self.merge_indicator, u" ")

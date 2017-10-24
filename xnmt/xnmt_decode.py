@@ -109,6 +109,8 @@ def output_processor_for_spec(spec):
     return JoinedCharTextOutputProcessor()
   elif spec == "join-bpe":
     return JoinedBPETextOutputProcessor()
+  elif spec == "join-piece":
+    return JoinedPieceTextOutputProcessor()
   elif spec == "rule":
     return RuleOutputProcessor()
   else:

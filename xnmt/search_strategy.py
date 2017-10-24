@@ -96,7 +96,8 @@ class BeamSearch(SearchStrategy):
         
         if trg_rule_vocab:
           # only keep rules with the correct rhs
-          score, num_valid_rule = dy.log_softmax(decoder.get_scores(dec_state, trg_rule_vocab)).npvalue()
+          score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
+          score = dy.log_softmax(score).npvalue()
         else:
           score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
         if forced_trg_ids is None:

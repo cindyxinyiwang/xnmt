@@ -489,9 +489,10 @@ class Tree(object):
       self.root = TreeNode(u'XXX', [], id=0, timestep=0)
       self.id2n[0] = self.root
       self.root.set_timestep(0, self.t2n)
-      id = self.root.add_child(TreeNode(u'ROOT', []), self.id2n)
-      if id >= 0:
-        self.open_nonterm_ids.append(id)
+      #id = self.root.add_child(TreeNode(u'ROOT', []), self.id2n)
+      #if id >= 0:
+      #  self.open_nonterm_ids.append(id)
+      self.open_nonterm_ids.append(0)
 
   def __str__(self):
     return self.root.to_parse_string()
@@ -547,7 +548,7 @@ class Tree(object):
       #assert len(derivs) == 1
     #  return tree
 
-    stack_tree = [ tree.root.children[0] ]
+    stack_tree = [ tree.root ]
     stack_children_left = [1]
 
     for r in derivs:

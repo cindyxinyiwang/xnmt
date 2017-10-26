@@ -156,7 +156,7 @@ class TreeDecoderState:
     #for n in self.open_nonterms:
     #  open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state))
 
-    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, states=self.states[:], tree=self.tree, \
+    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, \
                             open_nonterms=self.open_nonterms[:], prev_word_state=self.prev_word_state)
   #def copy(self):
   #  if hasattr(self.tree, 'copy'):
@@ -283,6 +283,9 @@ class TreeDecoder(RnnDecoder, Serializable):
       # decoding time
       cur_nonterm = tree_dec_state.open_nonterms.pop()
       rule = trg_rule_vocab[trg]
+      if cur_nonterm.label != rule.lhs:
+        for c in cur_nonterm:
+          print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
       # add rule to tree_dec_state.open_nonterms
       new_open_nonterms = []

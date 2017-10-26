@@ -146,6 +146,8 @@ class Rule(object):
     return hash(str(self))
 
   def __eq__(self, other):
+    if not hasattr(other, 'lhs'):
+      return False
     if not self.lhs == other.lhs:
       return False
     if not " ".join(self.rhs) == " ".join(other.rhs):

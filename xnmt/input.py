@@ -427,7 +427,7 @@ class TreeNode(object):
     if not piece:
       return u"".join(toks)
     else:
-      return u"".join(toks).replace(u'\u2581', u' ')
+      return u"".join(toks).replace(u'\u2581', u' ').strip()
 
   def parent(self):
     return self._parent

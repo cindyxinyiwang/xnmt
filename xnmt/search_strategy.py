@@ -101,10 +101,10 @@ class BeamSearch(SearchStrategy):
         else:
           score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
         if forced_trg_ids is None:
-          if trg_rule_vocab:
-            top_ids = np.argpartition(score, max(-num_valid_rule,-self.beam_size))[-min(self.beam_size, num_valid_rule):]
-          else:
-            top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
+          #if trg_rule_vocab:
+          #  top_ids = np.argpartition(score, max(-num_valid_rule,-self.beam_size))[-min(self.beam_size, num_valid_rule):]
+          #else:
+          top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
         else:
           top_ids = [forced_trg_ids[length]]
 
@@ -112,6 +112,7 @@ class BeamSearch(SearchStrategy):
           new_list = list(hyp.id_list)
           new_list.append(cur_id)
           if trg_rule_vocab:
+            if score[cur_id] == -np.inf: continue
             new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state.copy()))
           else:
             new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))

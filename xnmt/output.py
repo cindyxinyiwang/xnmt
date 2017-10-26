@@ -95,4 +95,4 @@ class JoinedPieceTextOutputProcessor(PlainTextOutputProcessor):
     self.merge_indicator = merge_indicator
 
   def words_to_string(self, word_list):
-    return u"".join(word_list).replace(self.merge_indicator, u" ")
+    return u"".join(word_list).replace(self.merge_indicator, u" ").strip()

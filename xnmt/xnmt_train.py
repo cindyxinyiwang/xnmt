@@ -273,11 +273,16 @@ class XnmtTrainer(object):
       output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
       # Copy Trg to Ref
       processed = []
-      with io.open(self.training_corpus.dev_trg, encoding=encoding) as fin:
-        for line in fin:
-          out = output_processor.words_to_string(line.strip().split()) 
-          out = out[0] if type(out) == list else out
-          processed.append(out + u"\n")
+      if self.training_corpus.dev_ref_file:
+        with io.open(self.training_corpus.dev_ref_file, encoding=encoding) as fin:
+          for line in fin:  
+            processed.append(line)
+      else:
+        with io.open(self.training_corpus.dev_trg, encoding=encoding) as fin:
+          for line in fin:
+            out = output_processor.words_to_string(line.strip().split()) 
+            out = out[0] if type(out) == list else out
+            processed.append(out + u"\n")
       with io.open(out_file_ref, 'wt', encoding=encoding) as fout:
         for line in processed:
           fout.write(line)

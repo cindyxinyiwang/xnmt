@@ -20,6 +20,7 @@ import xnmt.serializer
 import xnmt.evaluator
 from xnmt.batcher import mark_as_batch, is_batched
 from xnmt.loss import LossBuilder
+from xnmt.decoder import TreeDecoder
 
 # Reporting purposes
 from lxml import etree
@@ -139,7 +140,10 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       encodings = self.encoder.transduce(embeddings)
       self.attender.init_sent(encodings)
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-      dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
+      if isinstance(self.decoder, TreeDecoder):
+        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
+      else:
+        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
       output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents), forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab)
       # In case of reporting
       if self.report_path is not None:

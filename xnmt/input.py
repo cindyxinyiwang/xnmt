@@ -310,7 +310,7 @@ class TreeInput(Input):
     if pad_len == 0:
       return self
     new_words = list(self.words)
-    new_words.extend([[token]*3 ] * pad_len)
+    new_words.extend([[token]*4 ] * pad_len)
     return TreeInput(new_words)
 
   def __str__(self):
@@ -335,11 +335,11 @@ class TreeReader(BaseTextReader, Serializable):
     if len(filename) > 1:
       for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
         tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=True)
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*3 ]) 
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*4 ]) 
     else:
       for line in self.iterate_filtered(filename[0], filter_ids):
         tree = Tree(parse_root(tokenize(line)))
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*3 ]) 
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*4 ]) 
 
   def freeze(self):
     self.vocab.freeze()
@@ -623,7 +623,8 @@ class Tree(object):
           children.append(c.label)
           open_nonterms.append(c.label)
       paren_t = 0 if not node.parent() else node.parent().timestep
-      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t, node.last_word_t])
+      is_terminal = 1 if len(open_nonterms) == 0 else 0
+      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t, node.last_word_t, is_terminal])
     return data
 
   def query_open_node_label(self):

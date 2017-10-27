@@ -140,8 +140,9 @@ class OpenNonterm:
 
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
-  def __init__(self, rnn_state=None, context=None, states=[], tree=None, open_nonterms=[], prev_word_state=None):
+  def __init__(self, rnn_state=None, word_rnn_state=None, context=None, states=[], tree=None, open_nonterms=[], prev_word_state=None):
     self.rnn_state = rnn_state
+    self.word_rnn_state = word_rnn_state
     self.context = context
     # training time
     self.states = states
@@ -155,8 +156,7 @@ class TreeDecoderState:
     #open_nonterms_copy = []
     #for n in self.open_nonterms:
     #  open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state))
-
-    return TreeDecoderState(rnn_state=self.rnn_state, context=self.context, \
+    return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, \
                             open_nonterms=self.open_nonterms[:], prev_word_state=self.prev_word_state)
   #def copy(self):
   #  if hasattr(self.tree, 'copy'):
@@ -173,7 +173,7 @@ class TreeDecoder(RnnDecoder, Serializable):
   def __init__(self, context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None):
+               bridge=None, word_lstm=False):
     param_col = context.dynet_param_collection.param_col
     self.param_col = param_col
     # Define dim
@@ -185,11 +185,15 @@ class TreeDecoder(RnnDecoder, Serializable):
     # Input feeding
     self.input_feeding = input_feeding
     self.lstm_dim = lstm_dim
+    self.trg_embed_dim = trg_embed_dim
     lstm_input = trg_embed_dim
     if input_feeding:
       lstm_input += input_dim
+    plain_lstm_input = lstm_input
     # parent state + last_word_state
     lstm_input += lstm_dim * 2
+    if word_lstm:
+      lstm_input += lstm_dim
 
     self.init_lstm_dim = lstm_input - trg_embed_dim
     # Bridge
@@ -203,6 +207,15 @@ class TreeDecoder(RnnDecoder, Serializable):
                                               hidden_dim = lstm_dim,
                                               model = param_col,
                                               residual_to_output = residual_to_output)
+
+    self.word_lstm = word_lstm
+    if word_lstm:
+      self.word_lstm = RnnDecoder.rnn_from_spec(spec       = rnn_spec,
+                                                num_layers = layers,
+                                                input_dim  = plain_lstm_input,
+                                                hidden_dim = lstm_dim,
+                                                model = param_col,
+                                                residual_to_output = residual_to_output)
     # MLP
     self.context_projector = xnmt.linear.Linear(input_dim  = input_dim + lstm_dim,
                                            output_dim = mlp_hidden_dim,
@@ -224,18 +237,28 @@ class TreeDecoder(RnnDecoder, Serializable):
     :returns: An MlpSoftmaxDecoderState
     """
     rnn_state = self.fwd_lstm.initial_state()
-    rnn_state = rnn_state.set_s(self.bridge.decoder_init(enc_final_states))
+    init_state = self.bridge.decoder_init(enc_final_states)
+    rnn_state = rnn_state.set_s(init_state)
     #zeros = dy.zeros(self.lstm_dim + self.input_dim) if self.input_feeding \
     #  else  dy.zeros(self.lstm_dim)
     zeros = dy.zeros(self.init_lstm_dim)
     rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
+
+    if self.word_lstm:
+      word_rnn_state = self.word_lstm.initial_state()
+      word_rnn_state = word_rnn_state.set_s(init_state)
+      zeros = dy.zeros(self.input_dim) if self.input_feeding else None
+      word_rnn_state = word_rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
+    else:
+      word_rnn_state = None
+
     if decoding:
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros, \
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
           open_nonterms=[OpenNonterm('ROOT', parent_state=dy.zeros(self.lstm_dim))], \
           prev_word_state=dy.zeros(self.lstm_dim))
     else:
       batch_size = ss_expr.dim()[1]
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros, \
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
               states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]), tree=Tree())
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
@@ -255,6 +278,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       batch_size = trg_embedding.dim()[1]
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
+      is_terminal = trg.get_col(3)
       paren_tm1_list = []
       last_word_list = []
       for i in range(batch_size):
@@ -262,12 +286,22 @@ class TreeDecoder(RnnDecoder, Serializable):
         last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
       paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
       last_word_state = dy.concatenate_to_batch(last_word_list)
+      terminal_mask = dy.inputTensor(np.transpose(is_terminal), batched=True)
 
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
+      # get word_rnn state
+      if self.word_lstm:
+        word_inp = trg_embedding * terminal_mask
+        if self.input_feeding:
+          word_inp = dy.concatenate([word_inp, tree_dec_state.context])
+        word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
+        inp = dy.concatenate([inp, word_rnn_state.output()])
+      else:
+        word_rnn_state = None
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, \
-                           states=np.append(tree_dec_state.states, rnn_state.output()), tree=Tree())
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
+                           states=np.append(tree_dec_state.states, rnn_state.output()))
     else:
       # decoding time
       #lhs_node_id = tree_dec_state.tree.get_next_open_node()
@@ -296,8 +330,18 @@ class TreeDecoder(RnnDecoder, Serializable):
           tree_dec_state.prev_word_state = tree_dec_state.rnn_state.output()
       new_open_nonterms.reverse()
       tree_dec_state.open_nonterms.extend(new_open_nonterms)
-
       inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+
+      if self.word_lstm:
+        if len(rule.open_nonterms) == 0:
+          word_inp = trg_embedding
+        else:
+          word_inp = dy.zeros(self.trg_embed_dim)
+        if self.input_feeding:
+          word_inp = dy.concatenate([word_inp, tree_dec_state.context])
+        tree_dec_state.word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
+        inp = dy.concatenate([inp, tree_dec_state.word_rnn_state.output()])
+
       tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return tree_dec_state
 

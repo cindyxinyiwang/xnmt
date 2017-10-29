@@ -336,7 +336,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
 
       if self.word_lstm:
-        if len(rule.open_nonterms) == 0:
+        if len(new_open_nonterms) == 0:
           word_inp = trg_embedding
           if self.input_feeding:
             word_inp = dy.concatenate([word_inp, tree_dec_state.context])

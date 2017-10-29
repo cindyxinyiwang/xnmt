@@ -5,6 +5,7 @@ import xnmt.batcher
 from xnmt.hier_model import HierarchicalModel, recursive
 import xnmt.linear
 from input import *
+from lstm import CustomCompactLSTMBuilder
 
 class Decoder(HierarchicalModel):
   '''
@@ -28,6 +29,8 @@ class RnnDecoder(Decoder):
     elif decoder_type == "residuallstm":
       return residual.ResidualRNNBuilder(num_layers, input_dim, hidden_dim,
                                          model, residual_to_output)
+    elif decoder_type == "custom":
+      return CustomCompactLSTMBuilder(num_layers, input_dim, hidden_dim, model)
     else:
       raise RuntimeError("Unknown decoder type {}".format(spec))
 
@@ -210,7 +213,7 @@ class TreeDecoder(RnnDecoder, Serializable):
 
     self.word_lstm = word_lstm
     if word_lstm:
-      self.word_lstm = RnnDecoder.rnn_from_spec(spec       = rnn_spec,
+      self.word_lstm = RnnDecoder.rnn_from_spec(spec       = "custom",
                                                 num_layers = layers,
                                                 input_dim  = plain_lstm_input,
                                                 hidden_dim = lstm_dim,
@@ -245,8 +248,8 @@ class TreeDecoder(RnnDecoder, Serializable):
     rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
 
     if self.word_lstm:
-      word_rnn_state = self.word_lstm.initial_state()
-      word_rnn_state = word_rnn_state.set_s(init_state)
+      # init_state: [c, h]
+      word_rnn_state = self.word_lstm.initial_state(init_state)
       zeros = dy.zeros(self.input_dim) if self.input_feeding else None
       word_rnn_state = word_rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
     else:
@@ -278,7 +281,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       batch_size = trg_embedding.dim()[1]
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
-      is_terminal = trg.get_col(3)
+      is_terminal = trg.get_col(3, batched=False)
       paren_tm1_list = []
       last_word_list = []
       for i in range(batch_size):
@@ -286,15 +289,15 @@ class TreeDecoder(RnnDecoder, Serializable):
         last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
       paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
       last_word_state = dy.concatenate_to_batch(last_word_list)
-      terminal_mask = dy.inputTensor(np.transpose(is_terminal), batched=True)
+      #terminal_mask = dy.inputTensor(np.transpose(is_terminal), batched=True)
 
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
       # get word_rnn state
       if self.word_lstm:
-        word_inp = trg_embedding * terminal_mask
+        word_inp = trg_embedding
         if self.input_feeding:
           word_inp = dy.concatenate([word_inp, tree_dec_state.context])
-        word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
+        word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp, inv_mask=is_terminal)
         inp = dy.concatenate([inp, word_rnn_state.output()])
       else:
         word_rnn_state = None
@@ -335,11 +338,9 @@ class TreeDecoder(RnnDecoder, Serializable):
       if self.word_lstm:
         if len(rule.open_nonterms) == 0:
           word_inp = trg_embedding
-        else:
-          word_inp = dy.zeros(self.trg_embed_dim)
-        if self.input_feeding:
-          word_inp = dy.concatenate([word_inp, tree_dec_state.context])
-        tree_dec_state.word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
+          if self.input_feeding:
+            word_inp = dy.concatenate([word_inp, tree_dec_state.context])
+          tree_dec_state.word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
         inp = dy.concatenate([inp, tree_dec_state.word_rnn_state.output()])
 
       tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)

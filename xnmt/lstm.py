@@ -11,8 +11,8 @@ class LSTMState(object):
     self.h_t = h_t
     self.c_t = c_t
 
-  def add_input(self, x_t):
-    h_t, c_t = self.builder.add_input(x_t, self.prev_state)
+  def add_input(self, x_t, inv_mask=None):
+    h_t, c_t = self.builder.add_input(x_t, self.prev_state, inv_mask)
     return LSTMState(self.builder, h_t, c_t, self.state_idx+1, prev_state=self)
 
   def transduce(self, xs):
@@ -75,7 +75,7 @@ class CustomCompactLSTMBuilder(object):
     self.dropout_mask_h = None
     if vecs is not None:
       assert len(vecs)==2
-      return LSTMState(self, h_t=vecs[0], c_t=vecs[1])
+      return LSTMState(self, h_t=vecs[1], c_t=vecs[0])
     else:
       return LSTMState(self)
   def set_dropout_masks(self, batch_size=1):
@@ -85,7 +85,8 @@ class CustomCompactLSTMBuilder(object):
       self.dropout_mask_x = dy.random_bernoulli((self.input_dim,), retention_rate, scale, batch_size=batch_size)
       self.dropout_mask_h = dy.random_bernoulli((self.hidden_dim,), retention_rate, scale, batch_size=batch_size)
 
-  def add_input(self, x_t, prev_state):
+  def add_input(self, x_t, prev_state, inv_mask=None):
+    ''' inv_mask: np array of size (batch_size, 1), if given aplly mask. 1 means unmasked and 0 means masked'''
     batch_size = x_t.dim()[1]
     if self.dropout_rate > 0.0 and (self.dropout_mask_x is None or self.dropout_mask_h is None):
       self.set_dropout_masks(batch_size=batch_size)
@@ -104,6 +105,11 @@ class CustomCompactLSTMBuilder(object):
       gates_t = dy.vanilla_lstm_gates(x_t, h_tm1, self.Wx, self.Wh, self.b, self.weightnoise_std)
     c_t = dy.vanilla_lstm_c(c_tm1, gates_t)
     h_t = dy.vanilla_lstm_h(c_t, gates_t)
+    if inv_mask and np.count_nonzero(inv_mask) != 0:
+      inverse_mask = dy.inputTensor(np.transpose(inv_mask), batched=True)
+      mask = dy.inputTensor(np.transpose(1. - inv_mask), batched=True)
+      c_t = dy.cmult(c_t, inverse_mask) + dy.cmult(c_tm1, mask)
+      h_t = dy.cmult(h_t, inverse_mask) + dy.cmult(h_tm1, mask)
     return h_t, c_t
     
   def transduce(self, expr_seq):

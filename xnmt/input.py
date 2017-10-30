@@ -486,7 +486,7 @@ class Tree(object):
       self.root.set_timestep(0, self.t2n, self.id2n)
     else:
       self.last_word_t = 0
-      self.root = TreeNode(u'XXX', [], id=0, timestep=0)
+      self.root = TreeNode(u'ROOT', [], id=0, timestep=0)
       self.id2n[0] = self.root
       self.root.set_timestep(0, self.t2n)
       #id = self.root.add_child(TreeNode(u'ROOT', []), self.id2n)
@@ -752,10 +752,15 @@ def parse_root(toks):
 
 if __name__ == "__main__":
   # test on copy
-  '''
+
   s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
   tree = Tree(parse_root(tokenize(s)))
   print tree 
+  r = RuleVocab()
+  data = tree.get_data_root(r)
+  for d in data:
+    print d
+    print r[d[0]]
   for i, n in tree.id2n.items():
     print i, str(n), n.last_word_t
 
@@ -763,7 +768,7 @@ if __name__ == "__main__":
   print cop
   for i, n in cop.id2n.items():
     print i, n.to_parse_string(), n.last_word_t
-  '''
+
 
   # test on construction
   tree = Tree()

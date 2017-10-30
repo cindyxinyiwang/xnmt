@@ -266,7 +266,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     else:
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
-              states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]), tree=Tree())
+              states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
     """Add an input and update the state.
@@ -315,6 +315,9 @@ class TreeDecoder(RnnDecoder, Serializable):
         for c in cur_nonterm:
           print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
+      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+      tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)
+
       # add rule to tree_dec_state.open_nonterms
       new_open_nonterms = []
       for rhs in rule.rhs:
@@ -324,8 +327,7 @@ class TreeDecoder(RnnDecoder, Serializable):
           tree_dec_state.prev_word_state = tree_dec_state.rnn_state.output()
       new_open_nonterms.reverse()
       tree_dec_state.open_nonterms.extend(new_open_nonterms)
-      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
-
+      
       if self.set_word_lstm:
         if len(new_open_nonterms) == 0:
           word_inp = trg_embedding
@@ -333,8 +335,6 @@ class TreeDecoder(RnnDecoder, Serializable):
             word_inp = dy.concatenate([word_inp, tree_dec_state.context])
           tree_dec_state.word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
         #inp = dy.concatenate([inp, tree_dec_state.word_rnn_state.output()])
-
-      tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return tree_dec_state
 
   def get_scores(self, tree_dec_state, trg_rule_vocab=None):

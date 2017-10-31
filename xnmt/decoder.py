@@ -316,26 +316,30 @@ class TreeDecoder(RnnDecoder, Serializable):
           print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
       inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
-      tree_dec_state.rnn_state = tree_dec_state.rnn_state.add_input(inp)
+      rnn_state = tree_dec_state.rnn_state.add_input(inp)
 
       # add rule to tree_dec_state.open_nonterms
+      prev_word_state = tree_dec_state.prev_word_state
+      open_nonterms=tree_dec_state.open_nonterms[:]
       new_open_nonterms = []
       for rhs in rule.rhs:
         if rhs in rule.open_nonterms:
-          new_open_nonterms.append(OpenNonterm(rhs, parent_state=tree_dec_state.rnn_state.output()))
+          new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output()))
         else:
-          tree_dec_state.prev_word_state = tree_dec_state.rnn_state.output()
+          prev_word_state = rnn_state.output()
       new_open_nonterms.reverse()
-      tree_dec_state.open_nonterms.extend(new_open_nonterms)
+      open_nonterms.extend(new_open_nonterms)
       
       if self.set_word_lstm:
         if len(new_open_nonterms) == 0:
           word_inp = trg_embedding
           if self.input_feeding:
             word_inp = dy.concatenate([word_inp, tree_dec_state.context])
-          tree_dec_state.word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
-        #inp = dy.concatenate([inp, tree_dec_state.word_rnn_state.output()])
-      return tree_dec_state
+          word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
+      else:
+        word_rnn_state = None
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
+                              open_nonterms=open_nonterms, prev_word_state=prev_word_state)
 
   def get_scores(self, tree_dec_state, trg_rule_vocab=None):
     """Get scores given a current state.

@@ -111,11 +111,8 @@ class BeamSearch(SearchStrategy):
         for cur_id in top_ids:
           new_list = list(hyp.id_list)
           new_list.append(cur_id)
-          if trg_rule_vocab:
-            if score[cur_id] == -np.inf: continue
-            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state.copy()))
-          else:
-            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
+          if trg_rule_vocab and score[cur_id] == -np.inf: continue
+          new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
       length += 1
       
       if trg_rule_vocab:

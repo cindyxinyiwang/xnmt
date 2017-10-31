@@ -329,7 +329,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       new_open_nonterms.reverse()
       open_nonterms.extend(new_open_nonterms)
       
-      word_rnn_state = None
+      word_rnn_state = tree_dec_state.word_rnn_state
       if self.set_word_lstm:
         if len(new_open_nonterms) == 0:
           word_inp = trg_embedding

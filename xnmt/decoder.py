@@ -296,14 +296,13 @@ class TreeDecoder(RnnDecoder, Serializable):
 
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
       # get word_rnn state
+      word_rnn_state = None
       if self.set_word_lstm:
         word_inp = trg_embedding
         if self.input_feeding:
           word_inp = dy.concatenate([word_inp, tree_dec_state.context])
         word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp, inv_mask=is_terminal)
         #inp = dy.concatenate([inp, word_rnn_state.output()])
-      else:
-        word_rnn_state = None
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
@@ -330,14 +329,14 @@ class TreeDecoder(RnnDecoder, Serializable):
       new_open_nonterms.reverse()
       open_nonterms.extend(new_open_nonterms)
       
+      word_rnn_state = None
       if self.set_word_lstm:
         if len(new_open_nonterms) == 0:
           word_inp = trg_embedding
           if self.input_feeding:
             word_inp = dy.concatenate([word_inp, tree_dec_state.context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
-      else:
-        word_rnn_state = None
+        
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state)
 

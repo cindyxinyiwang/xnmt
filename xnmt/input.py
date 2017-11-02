@@ -613,7 +613,7 @@ class Tree(object):
 
   def get_data_root(self, rule_vocab):
     data = []
-    for t in xrange(len(self.t2n)):
+    for t in xrange(1, len(self.t2n)):
       node = self.t2n[t]
       children, open_nonterms = [], []
       for c in node.children:

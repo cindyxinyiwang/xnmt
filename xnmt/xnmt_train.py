@@ -128,9 +128,10 @@ class XnmtTrainer(object):
       self.logger = BatchLossTracker(args.dev_every, self.total_train_sent)
 
   def is_batch_mode(self):
-    return not (self.args.batch_size is None or
-                self.args.batch_size == 1 or
-                self.args.batch_strategy.lower() == 'none')
+    return True
+    #return not (self.args.batch_size is None or
+    #            self.args.batch_size == 1 or
+    #            self.args.batch_strategy.lower() == 'none')
 
   def pack_batches(self):
     self.train_src, self.train_trg = \

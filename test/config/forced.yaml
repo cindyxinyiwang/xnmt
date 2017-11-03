@@ -33,10 +33,9 @@ defaults:
         layers: 1
         bridge: !CopyBridge {}
   decode:
-    len_norm_type: !PolynomialNormalization
-      apply_during_search: true
-      m: 1
+    mode: forced
     src_file: examples/data/head.ja
+    ref_file: examples/data/head.en
   evaluate:
     ref_file: examples/data/head.en
 

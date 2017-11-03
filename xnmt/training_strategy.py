@@ -24,14 +24,14 @@ class TrainingStrategy(Serializable):
     else:
       self.loss_calculator = loss_calculator
 
-  def __call__(self, translator, dec_state, src, trg):
-      return self.loss_calculator(translator, dec_state, src, trg)
+  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1):
+      return self.loss_calculator(translator, dec_state, src, trg, pick_src_elem)
 
 
 class TrainingMLELoss(Serializable):
   yaml_tag = '!TrainingMLELoss'
 
-  def __call__(self, translator, dec_state, src, trg):
+  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1):
     trg_mask = trg.mask if xnmt.batcher.is_batched(trg) else None
     losses = []
     seq_len = len(trg[0]) if xnmt.batcher.is_batched(src) else len(trg)
@@ -46,8 +46,9 @@ class TrainingMLELoss(Serializable):
     for i in range(seq_len):
       ref_word = trg[i] if not xnmt.batcher.is_batched(src) \
                       else xnmt.batcher.mark_as_batch([single_trg[i] for single_trg in trg])
-
-      dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output())
+      #print(dec_state.rnn_state.output().dim())
+      dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output(), pick_src_elem)
+      #print(dec_state.context.dim())
       word_loss = translator.decoder.calc_loss(dec_state, ref_word)
       if xnmt.batcher.is_batched(src) and trg_mask is not None:
         word_loss = trg_mask.cmult_by_timestep_expr(word_loss, i, inverse=True)

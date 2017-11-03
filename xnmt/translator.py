@@ -56,7 +56,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
 
   yaml_tag = u'!DefaultTranslator'
 
-  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder):
+  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder, loop_trg=False):
     '''Constructor.
 
     :param src_embedder: A word embedder for the input language
@@ -71,6 +71,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     self.attender = attender
     self.trg_embedder = trg_embedder
     self.decoder = decoder
+    self.loop_trg = loop_trg
 
   def shared_params(self):
     return [set(["src_embedder.emb_dim", "encoder.input_dim"]),
@@ -104,7 +105,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
   def initialize_training_strategy(self, training_strategy):
     self.loss_calculator = training_strategy
 
-  def calc_loss(self, src, trg, loop=False):
+  def calc_loss(self, src, trg):
     """
     :param src: source sequence (unbatched, or batched + padded)
     :param trg: target sequence (unbatched, or batched + padded); losses will be accumulated only if trg_mask[batch,pos]==0, or no mask is set
@@ -116,21 +117,20 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     encodings = self.encoder(embeddings)
     self.attender.init_sent(encodings)
     # Initialize the hidden state from the encoder
-    if loop:
+    if self.loop_trg:
       loss = []
       enc_final_states = self.encoder.get_final_states()
       for i in xrange(len(trg)):
         ss = mark_as_batch([Vocab.SS])
-
         if trg.mask:
-          single_trg = mark_as_batch(trg[i], xnmt.batcher.Mask(trg.mask.np_arr[i]))
+          single_trg = mark_as_batch([trg[i]], xnmt.batcher.Mask(np.expand_dims(trg.mask.np_arr[i], 0)))
         else:
-          single_trg = mark_as_batch(trg[i])
-        print(single_trg)
-        print(single_trg.mask.np_arr)
-        dec_state = self.decoder.initial_state([dy.pick_batch_elem(enc_final_states, i)], \
+          single_trg = mark_as_batch([trg[i]])
+
+        dec_state = self.decoder.initial_state([enc_state.pick_batch_elem(i) for enc_state in enc_final_states], \
                                                 self.trg_embedder.embed(ss))
-        loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg))
+        #print(single_trg)
+        loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, pick_src_elem=i))
       return dy.esum(loss)
     else:
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS

@@ -225,8 +225,9 @@ class XnmtTrainer(object):
       # Loss calculation
       dy.renew_cg()
       loss_builder = LossBuilder()
+      #print(src)
       standard_loss = self.model.calc_loss(src, trg)
-
+      #print(src)
       if standard_loss.__class__ == LossBuilder:
         loss = None
         for loss_name, loss_expr in standard_loss.loss_nodes:
@@ -242,14 +243,17 @@ class XnmtTrainer(object):
         loss_builder.add_loss("additional_loss", additional_loss)
 
       # Log the loss sum
+      #print(standard_loss.dim())
       loss_value = loss_builder.compute()
+
       self.logger.update_epoch_loss(src, trg, loss_builder)
       if update_weights:
         loss_value.backward()
         self.trainer.update()
-
+      
       # Devel reporting
       self.logger.report_train_process()
+      #print(loss_value.dim())
       if self.logger.should_report_dev():
         self.dev_evaluation()
 
@@ -258,7 +262,8 @@ class XnmtTrainer(object):
   def dev_evaluation(self, out_ext=".dev_hyp", ref_ext=".dev_ref", encoding='utf-8'):
     self.model.set_train(False)
     self.logger.new_dev()
-    trg_words_cnt, loss_score = self.compute_dev_loss()
+    #trg_words_cnt, loss_score = self.compute_dev_loss()
+    trg_words_cnt, loss_score = 0, 0
     schedule_metric = self.args.schedule_metric.lower()
 
     eval_scores = {"loss" : loss_score}
@@ -338,7 +343,9 @@ class XnmtTrainer(object):
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
       dy.renew_cg()
+      print('dev_src i', self.dev_src[i])
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
+      print('dev loss', standard_loss.dim())
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
       loss_builder.compute()

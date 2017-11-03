@@ -73,6 +73,9 @@ class FinalTransducerState(object):
       self._cell_expr = 0.5 * dy.log( dy.cdiv(1.+self._main_expr, 1.-self._main_expr) )
     return self._cell_expr
 
+  def pick_batch_elem(self, i):
+    return FinalTransducerState(dy.pick_batch_elem(self._main_expr, i), dy.pick_batch_elem(self._cell_expr, i))
+
 
 ########################################################
 

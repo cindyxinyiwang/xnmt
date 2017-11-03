@@ -55,20 +55,33 @@ class StandardAttender(Attender, Serializable):
     if len(wi_dim[0]) == 1:
       self.WI = dy.reshape(self.WI, (wi_dim[0][0], 1), batch_size=wi_dim[1])
 
-  def calc_attention(self, state):
+  def calc_attention(self, state, pick_elem):
     V = dy.parameter(self.pV)
     U = dy.parameter(self.pU)
-
-    h = dy.tanh(dy.colwise_add(self.WI, V * state))
+    #print(state.dim())
+    #print('pick elem', pick_elem)
+    if pick_elem >= 0:
+      WI = dy.concatenate_to_batch([dy.pick_batch_elem(self.WI, pick_elem)])
+    else:
+      WI = self.WI
+    #print(WI.dim())
+    #print(state.dim())
+    h = dy.tanh(dy.colwise_add(WI, V * state))
     scores = dy.transpose(U * h)
     if self.curr_sent.mask is not None:
       scores = self.curr_sent.mask.add_to_tensor_expr(scores, multiplicator = -100.0)
+    if pick_elem >= 0:
+      scores = dy.concatenate_to_batch([dy.pick_batch_elem(scores, pick_elem)])
+    #print('score dim', scores.dim())
     normalized = dy.softmax(scores)
     self.attention_vecs.append(normalized)
     return normalized
 
-  def calc_context(self, state):
-    attention = self.calc_attention(state)
-    I = self.curr_sent.as_tensor()
+  def calc_context(self, state, pick_elem=-1):
+    attention = self.calc_attention(state, pick_elem)
+    if pick_elem >= 0:
+      I = dy.concatenate_to_batch([dy.pick_batch_elem(self.curr_sent.as_tensor(), pick_elem)])
+    else:
+      I = self.curr_sent.as_tensor()
     return I * attention
 

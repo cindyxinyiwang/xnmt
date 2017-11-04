@@ -340,8 +340,8 @@ class XnmtTrainer(object):
   def compute_dev_loss(self):
     loss_builder = LossBuilder()
     trg_words_cnt = 0
-    #for i in range(len(self.dev_src)):
-    for i in range(1):
+    for i in range(len(self.dev_src)):
+    #for i in range(1):
       dy.renew_cg()
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
       loss_builder.add_loss("loss", standard_loss)

@@ -33,9 +33,11 @@ defaults:
       attender: !StandardAttender {}
       trg_embedder: !SimpleWordEmbedder {}
       decoder: !TreeDecoder
+        word_lstm: True
         layers: 1
         mlp_hidden_dim: 512
         bridge: !CopyBridge {}
+      loop_trg: True
   decode:
     beam: 5
     post_process: rule

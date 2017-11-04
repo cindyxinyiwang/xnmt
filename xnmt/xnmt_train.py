@@ -262,8 +262,7 @@ class XnmtTrainer(object):
   def dev_evaluation(self, out_ext=".dev_hyp", ref_ext=".dev_ref", encoding='utf-8'):
     self.model.set_train(False)
     self.logger.new_dev()
-    #trg_words_cnt, loss_score = self.compute_dev_loss()
-    trg_words_cnt, loss_score = 0, 0
+    trg_words_cnt, loss_score = self.compute_dev_loss()
     schedule_metric = self.args.schedule_metric.lower()
 
     eval_scores = {"loss" : loss_score}
@@ -341,11 +340,10 @@ class XnmtTrainer(object):
   def compute_dev_loss(self):
     loss_builder = LossBuilder()
     trg_words_cnt = 0
-    for i in range(len(self.dev_src)):
+    #for i in range(len(self.dev_src)):
+    for i in range(1):
       dy.renew_cg()
-      print('dev_src i', self.dev_src[i])
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
-      print('dev loss', standard_loss.dim())
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
       loss_builder.compute()

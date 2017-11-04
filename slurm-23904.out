@@ -1,0 +1,159 @@
++ set -e
++ module load singularity
+++ /usr/bin/modulecmd bash load singularity
++ eval LC_ALL=C ';export' 'LC_ALL;LC_CTYPE=C' ';export' 'LC_CTYPE;LOADEDMODULES=rocks-openmpi:singularity' ';export' 'LOADEDMODULES;SINGULARITY_SHELL=/bin/bash' ';export' 'SINGULARITY_SHELL;_LMFILES_=/usr/share/Modules/modulefiles/rocks-openmpi:/usr/share/Modules/modulefiles/singularity' ';export' '_LMFILES_;'
+++ LC_ALL=C
+++ export LC_ALL
+++ LC_CTYPE=C
+++ export LC_CTYPE
+++ LOADEDMODULES=rocks-openmpi:singularity
+++ export LOADEDMODULES
+++ SINGULARITY_SHELL=/bin/bash
+++ export SINGULARITY_SHELL
+++ _LMFILES_=/usr/share/Modules/modulefiles/rocks-openmpi:/usr/share/Modules/modulefiles/singularity
+++ export _LMFILES_
++ singularity shell /projects/tir1/singularity/tensorflow-ubuntu-16.04.2-lts-nvidia-375.26.img
+[33mWARNING: Non existent 'bind point' directory in container: '/projects/tir1'
+[0m[33mWARNING: Non existent 'bind point' directory in container: '/projects/tir2'
+[0m[33mWARNING: Non existent 'bind point' directory in container: '/containers'
+[0mSingularity: Invoking an interactive shell within container...
+
+[0m+ module load cuda-8.0 cudnn-8.0-5.1
+++ /usr/bin/modulecmd bash load cuda-8.0 cudnn-8.0-5.1
++ eval CPATH=/opt/cudnn-5.1/include ';export' 'CPATH;C_INCLUDE_PATH=/opt/cudnn-5.1/include' ';export' 'C_INCLUDE_PATH;LD_LIBRARY_PATH=/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib' ';export' 'LD_LIBRARY_PATH;LOADEDMODULES=rocks-openmpi:singularity:cuda-8.0:cudnn-8.0-5.1' ';export' 'LOADEDMODULES;PATH=/opt/cuda-8.0/bin:/home/xinyiw1/miniconda2/envs/research/bin:/opt/cuda-8.0/bin/:/home/xinyiw1/sentencepiece/bin:/home/xinyiw1/boost_1_65/bin:/home/xinyiw1/autoconf-2.69/bin:/home/xinyiw1/gcc-5.2.0/bin:/home/xinyiw1/miniconda2/bin:/home/xinyiw1/gcc-5.2.0/bin:/opt/openmpi/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ganglia/bin:/opt/ganglia/sbin:/usr/java/latest/bin:/opt/pdsh/bin:/opt/rocks/bin:/opt/rocks/sbin:/home/xinyiw1/bin' ';export' 'PATH;_LMFILES_=/usr/share/Modules/modulefiles/rocks-openmpi:/usr/share/Modules/modulefiles/singularity:/usr/share/Modules/modulefiles/cuda-8.0:/usr/share/Modules/modulefiles/cudnn-8.0-5.1' ';export' '_LMFILES_;'
+++ CPATH=/opt/cudnn-5.1/include
+++ export CPATH
+++ C_INCLUDE_PATH=/opt/cudnn-5.1/include
+++ export C_INCLUDE_PATH
+++ LD_LIBRARY_PATH=/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
+++ export LD_LIBRARY_PATH
+++ LOADEDMODULES=rocks-openmpi:singularity:cuda-8.0:cudnn-8.0-5.1
+++ export LOADEDMODULES
+++ PATH=/opt/cuda-8.0/bin:/home/xinyiw1/miniconda2/envs/research/bin:/opt/cuda-8.0/bin/:/home/xinyiw1/sentencepiece/bin:/home/xinyiw1/boost_1_65/bin:/home/xinyiw1/autoconf-2.69/bin:/home/xinyiw1/gcc-5.2.0/bin:/home/xinyiw1/miniconda2/bin:/home/xinyiw1/gcc-5.2.0/bin:/opt/openmpi/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ganglia/bin:/opt/ganglia/sbin:/usr/java/latest/bin:/opt/pdsh/bin:/opt/rocks/bin:/opt/rocks/sbin:/home/xinyiw1/bin
+++ export PATH
+++ _LMFILES_=/usr/share/Modules/modulefiles/rocks-openmpi:/usr/share/Modules/modulefiles/singularity:/usr/share/Modules/modulefiles/cuda-8.0:/usr/share/Modules/modulefiles/cudnn-8.0-5.1
+++ export _LMFILES_
++ export CUDA_HOME=/projects/tir1/cuda-8.0.27.1
++ CUDA_HOME=/projects/tir1/cuda-8.0.27.1
++ PATH=/home/xinyiw1/bin:/opt/cuda-8.0/bin:/home/xinyiw1/miniconda2/envs/research/bin:/opt/cuda-8.0/bin/:/home/xinyiw1/sentencepiece/bin:/home/xinyiw1/boost_1_65/bin:/home/xinyiw1/autoconf-2.69/bin:/home/xinyiw1/gcc-5.2.0/bin:/home/xinyiw1/miniconda2/bin:/home/xinyiw1/gcc-5.2.0/bin:/opt/openmpi/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ganglia/bin:/opt/ganglia/sbin:/usr/java/latest/bin:/opt/pdsh/bin:/opt/rocks/bin:/opt/rocks/sbin:/home/xinyiw1/bin
++ PATH=/projects/tir1/cuda-8.0.27.1/bin:/home/xinyiw1/bin:/opt/cuda-8.0/bin:/home/xinyiw1/miniconda2/envs/research/bin:/opt/cuda-8.0/bin/:/home/xinyiw1/sentencepiece/bin:/home/xinyiw1/boost_1_65/bin:/home/xinyiw1/autoconf-2.69/bin:/home/xinyiw1/gcc-5.2.0/bin:/home/xinyiw1/miniconda2/bin:/home/xinyiw1/gcc-5.2.0/bin:/opt/openmpi/bin:/usr/lib64/qt-3.3/bin:/usr/local/bin:/bin:/usr/bin:/usr/local/sbin:/usr/sbin:/sbin:/opt/ganglia/bin:/opt/ganglia/sbin:/usr/java/latest/bin:/opt/pdsh/bin:/opt/rocks/bin:/opt/rocks/sbin:/home/xinyiw1/bin
++ export PATH
++ export LD_LIBRARY_PATH=/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ LD_LIBRARY_PATH=/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ export CPATH=/projects/tir1/cuda-8.0.27.1/include:/opt/cudnn-5.1/include
++ CPATH=/projects/tir1/cuda-8.0.27.1/include:/opt/cudnn-5.1/include
++ export LIBRARY_PATH=/projects/tir1/cuda-8.0.27.1/lib64:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ LIBRARY_PATH=/projects/tir1/cuda-8.0.27.1/lib64:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ export LD_LIBRARY_PATH=/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ LD_LIBRARY_PATH=/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ export LD_LIBRARY_PATH=/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ LD_LIBRARY_PATH=/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ export CPATH=/opt/cudnn-8.0/include:/projects/tir1/cuda-8.0.27.1/include:/opt/cudnn-5.1/include
++ CPATH=/opt/cudnn-8.0/include:/projects/tir1/cuda-8.0.27.1/include:/opt/cudnn-5.1/include
++ export LIBRARY_PATH=/opt/cudnn-8.0/lib64:/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ LIBRARY_PATH=/opt/cudnn-8.0/lib64:/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ echo /opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
+/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-base/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
++ model_name=tree
++ python xnmt/xnmt_run_experiments.py examples/kftt_wordlstm.yaml --dynet-gpu --dynet-mem 10000 --dynet-autobatch 1
+[dynet] initializing CUDA
+[dynet] Request for 1 specific GPU ...
+[dynet] Device Number: 0
+[dynet]   Device name: GeForce GTX 1080 Ti
+[dynet]   Memory Clock Rate (KHz): 5505000
+[dynet]   Memory Bus Width (bits): 352
+[dynet]   Peak Memory Bandwidth (GB/s): 484.44
+[dynet]   Memory Free (GB): 11.5442/11.7151
+[dynet]
+[dynet] Device(s) selected: 0
+[dynet] random seed: 1174774471
+[dynet] using autobatching
+[dynet] allocating memory: 10000MB
+[dynet] memory allocation done.
+=> Running kftt-tree-wordlstm
+   > Preprocessing   
+   > Training   
+   initialized BilingualTrainingCorpus({'train_src': '/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.ja', 'dev_trg': '/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.en', 'dev_ref_file': '/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en', 'dev_src': '/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja', 'train_trg': '/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.upparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.en'})   
+   initialized PlainTextReader({})   
+   initialized TreeReader({})   
+   initialized BilingualCorpusParser({'trg_reader': <xnmt.input.TreeReader object at 0x7f688168cdd0>, 'src_reader': <xnmt.input.PlainTextReader object at 0x7f688168ce90>})   
+   /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.ja   
+   /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja   
+   initialized SimpleWordEmbedder({'vocab_size': 48841, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>})   
+   initialized LSTMSeqTransducer({'layers': 1, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>})   
+   initialized StandardAttender({'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>})   
+   initialized SimpleWordEmbedder({'vocab_size': 55991, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>})   
+   initialized CopyBridge({'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>, 'dec_layers': 1})   
+   initialized TreeDecoder({'layers': 1, 'bridge': <xnmt.decoder.CopyBridge object at 0x7f6881172c50>, 'vocab_size': 55991, 'mlp_hidden_dim': 512, 'word_lstm': True, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f688168cb50>})   
+   initialized DefaultTranslator({'attender': <xnmt.attender.StandardAttender object at 0x7f68811720d0>, 'decoder': <xnmt.decoder.TreeDecoder object at 0x7f6881172a90>, 'src_embedder': <xnmt.embedder.SimpleWordEmbedder object at 0x7f6881581fd0>, 'loop_trg': False, 'trg_embedder': <xnmt.embedder.SimpleWordEmbedder object at 0x7f68811722d0>, 'encoder': <xnmt.lstm.LSTMSeqTransducer object at 0x7f6881581f10>})   
+   initialized SentShuffleBatcher({'batch_size': 16})   
+   Epoch 0.0191: train_loss/word=3.561 (words=153792, words/sec=4871.37, time=0-00:00:31)   
+   Epoch 0.0380: train_loss/word=3.161 (words=304880, words/sec=4916.66, time=0-00:01:02)   
+   Epoch 0.0571: train_loss/word=3.036 (words=459664, words/sec=4853.05, time=0-00:01:34)   
+   Epoch 0.0759: train_loss/word=2.962 (words=611408, words/sec=4839.56, time=0-00:02:05)   
+   Epoch 0.0950: train_loss/word=2.918 (words=766992, words/sec=4858.78, time=0-00:02:37)   
+   Epoch 0.1139: train_loss/word=2.844 (words=919696, words/sec=4876.03, time=0-00:03:08)   
+   Epoch 0.1330: train_loss/word=2.792 (words=1074912, words/sec=4877.51, time=0-00:03:40)   
+   Epoch 0.1518: train_loss/word=2.746 (words=1227136, words/sec=4830.32, time=0-00:04:12)   
+   Epoch 0.1709: train_loss/word=2.707 (words=1379184, words/sec=4849.61, time=0-00:04:43)   
+   Epoch 0.1898: train_loss/word=2.661 (words=1529600, words/sec=4844.52, time=0-00:05:14)   
+   Epoch 0.2089: train_loss/word=2.626 (words=1680336, words/sec=4844.84, time=0-00:05:45)   
+   Epoch 0.2277: train_loss/word=2.581 (words=1835168, words/sec=4861.40, time=0-00:06:17)   
+   Epoch 0.2468: train_loss/word=2.542 (words=1991600, words/sec=4852.90, time=0-00:06:49)   
+   Epoch 0.2657: train_loss/word=2.508 (words=2141824, words/sec=4843.13, time=0-00:07:20)   
+   Epoch 0.2848: train_loss/word=2.471 (words=2292768, words/sec=4853.71, time=0-00:07:51)   
+   Epoch 0.3036: train_loss/word=2.441 (words=2439856, words/sec=4863.40, time=0-00:08:22)   
+   Epoch 0.3228: train_loss/word=2.408 (words=2593280, words/sec=4816.91, time=0-00:08:54)   
+   Epoch 0.3416: train_loss/word=2.377 (words=2746640, words/sec=4826.54, time=0-00:09:25)   
+   Epoch 0.3607: train_loss/word=2.352 (words=2901440, words/sec=4828.32, time=0-00:09:57)   
+   Epoch 0.3795: train_loss/word=2.324 (words=3052416, words/sec=4829.27, time=0-00:10:29)   
+   Epoch 0.3987: train_loss/word=2.296 (words=3206976, words/sec=4840.55, time=0-00:11:01)   
+   Epoch 0.4175: train_loss/word=2.270 (words=3357392, words/sec=4864.78, time=0-00:11:31)   
+   Epoch 0.4366: train_loss/word=2.244 (words=3509664, words/sec=4859.53, time=0-00:12:03)   
+   Epoch 0.4554: train_loss/word=2.219 (words=3663872, words/sec=4826.60, time=0-00:12:35)   
+   Epoch 0.4746: train_loss/word=2.194 (words=3817680, words/sec=4835.49, time=0-00:13:07)   
+   Epoch 0.4934: train_loss/word=2.170 (words=3967760, words/sec=4840.10, time=0-00:13:38)   
+   Epoch 0.5125: train_loss/word=2.146 (words=4125472, words/sec=4850.19, time=0-00:14:10)   
+   Epoch 0.5313: train_loss/word=2.125 (words=4278896, words/sec=4850.24, time=0-00:14:42)   
+   Epoch 0.5505: train_loss/word=2.104 (words=4427728, words/sec=4832.12, time=0-00:15:13)   
+   Epoch 0.5693: train_loss/word=2.083 (words=4579728, words/sec=4820.76, time=0-00:15:44)   
+   Epoch 0.5884: train_loss/word=2.063 (words=4733024, words/sec=4810.06, time=0-00:16:16)   
+   Epoch 0.6072: train_loss/word=2.042 (words=4891776, words/sec=4838.43, time=0-00:16:49)   
+   Epoch 0.6264: train_loss/word=2.023 (words=5047184, words/sec=4846.72, time=0-00:17:21)   
+   Epoch 0.6452: train_loss/word=2.004 (words=5198688, words/sec=4811.78, time=0-00:17:52)   
+   Epoch 0.6643: train_loss/word=1.986 (words=5354432, words/sec=4735.18, time=0-00:18:25)   
+   Epoch 0.6832: train_loss/word=1.969 (words=5504784, words/sec=4746.97, time=0-00:18:57)   
+   Epoch 0.7023: train_loss/word=1.952 (words=5661968, words/sec=4851.70, time=0-00:19:29)   
+   Epoch 0.7211: train_loss/word=1.934 (words=5820528, words/sec=4856.86, time=0-00:20:02)   
+   Epoch 0.7401: train_loss/word=1.921 (words=5970463, words/sec=4814.40, time=0-00:20:33)   
+   Epoch 0.7592: train_loss/word=1.905 (words=6125951, words/sec=4659.24, time=0-00:21:06)   
+   Epoch 0.7781: train_loss/word=1.891 (words=6276671, words/sec=4671.42, time=0-00:21:39)   
+   Epoch 0.7972: train_loss/word=1.876 (words=6434831, words/sec=4670.00, time=0-00:22:13)   
+   Epoch 0.8160: train_loss/word=1.862 (words=6587791, words/sec=4680.29, time=0-00:22:45)   
+   Epoch 0.8351: train_loss/word=1.847 (words=6745775, words/sec=4699.84, time=0-00:23:19)   
+   Epoch 0.8540: train_loss/word=1.836 (words=6891663, words/sec=4712.84, time=0-00:23:50)   
+   Epoch 0.8731: train_loss/word=1.822 (words=7047487, words/sec=4699.17, time=0-00:24:23)   
+   Epoch 0.8919: train_loss/word=1.811 (words=7197695, words/sec=4679.12, time=0-00:24:55)   
+   Epoch 0.9110: train_loss/word=1.800 (words=7350767, words/sec=4675.33, time=0-00:25:28)   
+   Epoch 0.9299: train_loss/word=1.789 (words=7500383, words/sec=4695.00, time=0-00:26:00)   
+   Epoch 0.9490: train_loss/word=1.777 (words=7652799, words/sec=4683.74, time=0-00:26:32)   
+   Epoch 0.9678: train_loss/word=1.766 (words=7807311, words/sec=4695.44, time=0-00:27:05)   
+   Epoch 0.9869: train_loss/word=1.756 (words=7962895, words/sec=4697.44, time=0-00:27:38)   
+   Epoch 1.0000: train_loss/word=1.749 (words=8067007, words/sec=4677.40, time=0-00:28:00)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja   
+   > Checkpoint   
+     Epoch 1.0000 dev [auxiliary] BLEU4: 0.0, 0.112703/0.000693/0.000000/0.000000 (BP = 1.000000, ratio=1.01, hyp_len=22759, ref_len=22551)   
+     Epoch 1.0000 dev 0 (words=0, words/sec=0.00, time=0-01:09:34)   
+   Traceback (most recent call last):
+     File "xnmt/xnmt_run_experiments.py", line 170, in <module>
+          sys.exit(main())
+     File "xnmt/xnmt_run_experiments.py", line 131, in main
+          xnmt_trainer.run_epoch()
+     File "/home/xinyiw1/miniconda2/envs/research/lib/python2.7/site-packages/xnmt-0.0.1-py2.7.egg/xnmt/xnmt_train.py", line 258, in run_epoch
+          self.dev_evaluation()
+     File "/home/xinyiw1/miniconda2/envs/research/lib/python2.7/site-packages/xnmt-0.0.1-py2.7.egg/xnmt/xnmt_train.py", line 316, in dev_evaluation
+          if self.logger.report_dev_and_check_model(self.args.model_file):
+     File "/home/xinyiw1/miniconda2/envs/research/lib/python2.7/site-packages/xnmt-0.0.1-py2.7.egg/xnmt/loss_tracker.py", line 129, in report_dev_and_check_model
+          save_model = self.dev_score.better_than(self.best_dev_score)
+   AttributeError   :    'int' object has no attribute 'better_than'   

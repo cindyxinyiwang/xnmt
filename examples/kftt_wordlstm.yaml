@@ -8,6 +8,7 @@ defaults:
     run_for_epochs: 40
     eval_metrics: bleu
   train:
+    lr_decay_times: 100
     batcher: !SentShuffleBatcher
       batch_size: 16
     dropout: 0.1
@@ -28,6 +29,7 @@ defaults:
       src_reader: !PlainTextReader {}
       trg_reader: !TreeReader {}
     model: !DefaultTranslator
+      loop_trg: False
       src_embedder: !SimpleWordEmbedder {}
       encoder: !LSTMSeqTransducer
         layers: 1
@@ -47,4 +49,4 @@ defaults:
   evaluate:
     ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en
 
-kftt-tree-wordlstm-mask:
+kftt-tree-wordlstm:

@@ -31,4 +31,5 @@ echo $LD_LIBRARY_PATH
 model_name=tree
 python xnmt/xnmt_run_experiments.py examples/kftt_wordlstm.yaml \
 		--dynet-gpu \
-		--dynet-mem 10000 
+		--dynet-mem 10000 \
+		--dynet-autobatch 1 

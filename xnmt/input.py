@@ -322,8 +322,9 @@ class TreeReader(BaseTextReader, Serializable):
   parse tree. The vocab object has to be a RuleVocab
   """
   yaml_tag = u'!TreeReader'
-  def __init__(self, vocab=None):
+  def __init__(self, vocab=None, binarize=True):
     self.vocab = vocab
+    self.binarize = binarize
     if vocab is not None:
       self.vocab.freeze()
       self.vocab.set_unk(Vocab.UNK_STR)
@@ -334,8 +335,8 @@ class TreeReader(BaseTextReader, Serializable):
     filename = filename.split(',')
     if len(filename) > 1:
       for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
-        tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=True)
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5 ])
+        tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=self.binarize)
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*4 ]) 
     else:
       for line in self.iterate_filtered(filename[0], filter_ids):
         tree = Tree(parse_root(tokenize(line)))
@@ -669,9 +670,9 @@ def split_sent_piece(root, piece_l, word_idx):
       #word_idx += (space_c + 1)
       piece = piece_l[word_idx].split()
       word_idx += 1 
-      if u"".join(piece) != u'\u2581'+c and c != '-LRB-' and c != '-RRB-':
-        print c.decode('utf-8').split()
-        print piece
+      #if u"".join(piece) != u'\u2581'+c and c != '-LRB-' and c != '-RRB-':
+      #  print c.decode('utf-8').split()
+      #  print piece
       if len(piece) == 1:
         n = TreeNode(u'x', piece)
         n._parent = root

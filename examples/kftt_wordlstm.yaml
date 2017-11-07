@@ -5,46 +5,48 @@ defaults:
     out_file: examples/output/<EXP>.out
     err_file: examples/output/<EXP>.err
     cfg_file: examples/output/<EXP>.yaml
-    run_for_epochs: 20
+    run_for_epochs: 40
     eval_metrics: bleu
   train:
+    lr_decay_times: 100
     batcher: !SentShuffleBatcher
-      batch_size: 1
+      batch_size: 16
     dropout: 0.1
     default_layer_dim: 512
     restart_trainer: True
     trainer: Adam
     learning_rate: 0.0002
     lr_decay: 0.5
+    lr_decay_times: 10
     dev_metrics: bleu
-    dev_every: 1
     training_corpus: !BilingualTrainingCorpus
-      train_src: examples/data/train.piece.ja
-      train_trg: examples/data/train.parse.en,examples/data/train.piece.en
-      dev_src: examples/data/dev.piece.ja
-      dev_trg: examples/data/dev.parse.en,examples/data/dev.piece.en
+      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.ja
+      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.upparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.en
+      dev_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja
+      dev_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.en
+      dev_ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en
     corpus_parser: !BilingualCorpusParser
       src_reader: !PlainTextReader {}
       trg_reader: !TreeReader {}
     model: !DefaultTranslator
+      loop_trg: False
       src_embedder: !SimpleWordEmbedder {}
       encoder: !LSTMSeqTransducer
         layers: 1
       attender: !StandardAttender {}
       trg_embedder: !SimpleWordEmbedder {}
       decoder: !TreeDecoder
-        word_lstm: True
         layers: 1
         mlp_hidden_dim: 512
         bridge: !CopyBridge {}
-      loop_trg: False
+        word_lstm: True
   decode:
     beam: 5
     post_process: rule
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
-    src_file: examples/data/test.ja
+    src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja
   evaluate:
-    ref_file: examples/data/test.en
+    ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en
 
-tree:
+kftt-tree-wordlstm:

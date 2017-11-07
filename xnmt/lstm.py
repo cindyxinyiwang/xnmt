@@ -80,8 +80,11 @@ class LSTMState(object):
     self.c_t = c_t
 
   def add_input(self, x_t, inv_mask=None):
-    c_t, h_t = self.builder.add_input(x_t, self, inv_mask)
-    return LSTMState(self.builder, h_t, c_t, self.state_idx+1, prev_state=prev_state)
+    if inv_mask:
+      h_t, c_t = self.builder.add_input(x_t, self.prev_state, inv_mask)
+    else:
+      h_t, c_t = self.builder.add_input(x_t, self.prev_state)
+    return LSTMState(self.builder, h_t, c_t, self.state_idx+1, prev_state=self)
 
   def transduce(self, xs):
     return self.builder.transduce(xs)

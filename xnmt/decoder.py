@@ -252,7 +252,9 @@ class TreeDecoder(RnnDecoder, Serializable):
 
     if self.set_word_lstm:
       # init_state: [c, h]
-      word_rnn_state = self.word_lstm.initial_state(init_state)
+      #word_rnn_state = self.word_lstm.initial_state(init_state)
+      word_rnn_state = self.word_lstm.initial_state()
+      word_rnn_state = word_rnn_state.set_s(init_state)
       zeros = dy.zeros(self.input_dim) if self.input_feeding else None
       word_rnn_state = word_rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
     else:

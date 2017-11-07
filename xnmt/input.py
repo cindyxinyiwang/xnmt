@@ -310,7 +310,7 @@ class TreeInput(Input):
     if pad_len == 0:
       return self
     new_words = list(self.words)
-    new_words.extend([[token]*4 ] * pad_len)
+    new_words.extend([[token]*5 ] * pad_len)
     return TreeInput(new_words)
 
   def __str__(self):
@@ -335,11 +335,11 @@ class TreeReader(BaseTextReader, Serializable):
     if len(filename) > 1:
       for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
         tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=True)
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*4 ]) 
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5 ])
     else:
       for line in self.iterate_filtered(filename[0], filter_ids):
         tree = Tree(parse_root(tokenize(line)))
-        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*4 ]) 
+        yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5 ])
 
   def freeze(self):
     self.vocab.freeze()
@@ -446,12 +446,13 @@ class TreeNode(object):
         return child.id 
     return -1
 
-  def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0):
+  def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0, sib_t=0):
     '''
     initialize timestep for each node
     '''
     self.timestep = t 
     self.last_word_t = last_word_t
+    self.sib_t = sib_t
     next_word_t = last_word_t
     if not t2n is None:
       assert self.timestep == len(t2n)
@@ -460,11 +461,14 @@ class TreeNode(object):
     if not id2n is None:
       self.id = t
       id2n[t] = self
+    sib_t = 0
     for c in self.children:
+      c_t = t+1 # time of current child
       if hasattr(c, 'set_timestep'):
-        t, next_word_t = c.set_timestep(t+1, t2n, id2n, next_word_t)
+        t, next_word_t = c.set_timestep(c_t, t2n, id2n, next_word_t, sib_t)
       else:
         next_word_t = t
+      sib_t = c_t
     return t, next_word_t
 
 
@@ -624,7 +628,7 @@ class Tree(object):
           open_nonterms.append(c.label)
       paren_t = 0 if not node.parent() else node.parent().timestep
       is_terminal = 1 if len(open_nonterms) == 0 else 0
-      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t, node.last_word_t, is_terminal])
+      data.append([rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t, node.last_word_t, is_terminal, node.sib_t])
     return data
 
   def query_open_node_label(self):
@@ -763,7 +767,7 @@ if __name__ == "__main__":
     print d
     print r[d[0]]
   for i, n in tree.id2n.items():
-    print i, str(n), n.last_word_t
+    print i, str(n), n.last_word_t, n.sib_t
 
   cop = tree.copy() 
   print cop

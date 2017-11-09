@@ -46,9 +46,7 @@ class TrainingMLELoss(Serializable):
     for i in range(seq_len):
       ref_word = trg[i] if not xnmt.batcher.is_batched(src) \
                       else xnmt.batcher.mark_as_batch([single_trg[i] for single_trg in trg])
-      #print(dec_state.rnn_state.output().dim())
       dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output(), pick_src_elem)
-      #print(dec_state.context.dim())
       word_loss = translator.decoder.calc_loss(dec_state, ref_word)
       if xnmt.batcher.is_batched(src) and trg_mask is not None:
         word_loss = trg_mask.cmult_by_timestep_expr(word_loss, i, inverse=True)

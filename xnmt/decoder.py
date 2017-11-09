@@ -193,7 +193,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       lstm_input += input_dim
     plain_lstm_input = lstm_input
     # parent state + last_word_state + sibling state
-    lstm_input += lstm_dim * 3
+    lstm_input += lstm_dim * 2
     if word_lstm:
       lstm_input += lstm_dim
 
@@ -252,9 +252,7 @@ class TreeDecoder(RnnDecoder, Serializable):
 
     if self.set_word_lstm:
       # init_state: [c, h]
-      #word_rnn_state = self.word_lstm.initial_state(init_state)
-      word_rnn_state = self.word_lstm.initial_state()
-      word_rnn_state = word_rnn_state.set_s(init_state)
+      word_rnn_state = self.word_lstm.initial_state(init_state)
       zeros = dy.zeros(self.input_dim) if self.input_feeding else None
       word_rnn_state = word_rnn_state.add_input(dy.concatenate([ss_expr, zeros]))
     else:
@@ -286,20 +284,20 @@ class TreeDecoder(RnnDecoder, Serializable):
       batch_size = trg_embedding.dim()[1]
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
-      sib_states = tree_dec_state.states[trg.get_col(4)]
+      #sib_states = tree_dec_state.states[trg.get_col(4)]
       is_terminal = trg.get_col(3, batched=False)
       paren_tm1_list = []
       last_word_list = []
-      sib_state_list = []
+      #sib_state_list = []
       for i in range(batch_size):
         paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
         last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
-        sib_state_list.append(dy.pick_batch_elem(sib_states[i], i))
+        #sib_state_list.append(dy.pick_batch_elem(sib_states[i], i))
       paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
       last_word_state = dy.concatenate_to_batch(last_word_list)
-      sib_state = dy.concatenate_to_batch(sib_state_list)
+      #sib_state = dy.concatenate_to_batch(sib_state_list)
 
-      inp = dy.concatenate([inp, paren_tm1_state, last_word_state, sib_state])
+      inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
       #inp = dy.concatenate([inp, paren_tm1_state, sib_state])
       # get word_rnn state
       word_rnn_state = tree_dec_state.word_rnn_state
@@ -322,7 +320,7 @@ class TreeDecoder(RnnDecoder, Serializable):
         for c in cur_nonterm:
           print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
-      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state, cur_nonterm.sib_state])
+      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
       #inp = dy.concatenate([inp, cur_nonterm.parent_state, cur_nonterm.sib_state])
 
       word_rnn_state = tree_dec_state.word_rnn_state
@@ -336,8 +334,8 @@ class TreeDecoder(RnnDecoder, Serializable):
  
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       # add current state to its sibling
-      if cur_nonterm.is_sibling:
-        tree_dec_state.open_nonterms[-1].sib_state = rnn_state.output()
+      #if cur_nonterm.is_sibling:
+      #  tree_dec_state.open_nonterms[-1].sib_state = rnn_state.output()
       # add rule to tree_dec_state.open_nonterms
       prev_word_state = tree_dec_state.prev_word_state
       open_nonterms=tree_dec_state.open_nonterms[:]
@@ -346,7 +344,8 @@ class TreeDecoder(RnnDecoder, Serializable):
         if new_open_nonterms:
           new_open_nonterms[-1].is_sibling = True # sibling ends at the second to last child
         if rhs in rule.open_nonterms:
-          new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output(), sib_state=dy.zeros(self.lstm_dim)))
+          #new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output(), sib_state=dy.zeros(self.lstm_dim)))
+          new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output()))
         else:
           prev_word_state = rnn_state.output()
       new_open_nonterms.reverse()

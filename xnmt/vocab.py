@@ -117,6 +117,12 @@ class RuleVocab(Vocab):
     self.serialize_params = {"i2w" : self.i2w}
     self.lhs_to_index = defaultdict(list)
 
+    self.tag_vocab = Vocab()
+
+  def freeze(self):
+    self.frozen = True
+    self.tag_vocab.freeze()
+
   def convert(self, w):
     ''' w is a Rule object'''
     if w not in self.w2i:
@@ -126,6 +132,11 @@ class RuleVocab(Vocab):
       self.w2i[w] = len(self.i2w)
       self.lhs_to_index[w.lhs].append(len(self.i2w))
       self.i2w.append(w)
+
+    self.tag_vocab.convert(w.lhs)
+    for r in w.open_nonterms:
+      self.tag_vocab.convert(r)
+
     return self.w2i[w] 
 
   def rule_index_with_lhs(self, lhs):

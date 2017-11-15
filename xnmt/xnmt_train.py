@@ -226,7 +226,7 @@ class XnmtTrainer(object):
       dy.renew_cg()
       loss_builder = LossBuilder()
       #print(src)
-      standard_loss = self.model.calc_loss(src, trg)
+      standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab)
       #print(src)
       if standard_loss.__class__ == LossBuilder:
         loss = None
@@ -343,7 +343,7 @@ class XnmtTrainer(object):
     for i in range(len(self.dev_src)):
     #for i in range(1):
       dy.renew_cg(immediate_compute=True)
-      standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i])
+      standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
       loss_builder.compute()

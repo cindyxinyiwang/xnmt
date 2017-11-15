@@ -258,14 +258,17 @@ class TreeDecoder(RnnDecoder, Serializable):
     else:
       word_rnn_state = None
 
+    self.decoding = decoding
     if decoding:
+      zeros_lstm = dy.zeros(self.lstm_dim)
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
-          open_nonterms=[OpenNonterm('ROOT', parent_state=dy.zeros(self.lstm_dim), sib_state=dy.zeros(self.lstm_dim))], \
-          prev_word_state=dy.zeros(self.lstm_dim))
+          open_nonterms=[OpenNonterm('ROOT', parent_state=zeros_lstm, sib_state=zeros_lstm)], \
+          prev_word_state=zeros_lstm)
     else:     
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
-              states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
+        open_nonterms=[OpenNonterm('ROOT')], \
+          states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
     """Add an input and update the state.
@@ -279,26 +282,41 @@ class TreeDecoder(RnnDecoder, Serializable):
     inp = trg_embedding
     if self.input_feeding:
       inp = dy.concatenate([inp, tree_dec_state.context])
-    if not trg_rule_vocab:
+    if not self.decoding:
       # get parent states for this batch
       batch_size = trg_embedding.dim()[1]
+      assert batch_size == 1
+      #cur_nonterm = tree_dec_state.open_nonterms.pop()
+      #rule = trg_rule_vocab[trg.get_col(0)[0]]
+      #if cur_nonterm.label != rule.lhs:
+      #  for c in cur_nonterm:
+      #    print c.label
+      #assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
+      #new_open_nonterms = []
+      #open_nonterms = tree_dec_state.open_nonterms[:]
+      #for rhs in rule.open_nonterms:
+      #  new_open_nonterms.append(OpenNonterm(rhs))
+      #new_open_nonterms.reverse()
+      #open_nonterms.extend(new_open_nonterms)
+
+      #print(rule)
+      #for n in open_nonterms:
+      #  print(n.label.encode('utf-8'))
+
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
-      #sib_states = tree_dec_state.states[trg.get_col(4)]
       is_terminal = trg.get_col(3, batched=False)
-      paren_tm1_list = []
-      last_word_list = []
-      #sib_state_list = []
-      for i in range(batch_size):
-        paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
-        last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
-        #sib_state_list.append(dy.pick_batch_elem(sib_states[i], i))
-      paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
-      last_word_state = dy.concatenate_to_batch(last_word_list)
-      #sib_state = dy.concatenate_to_batch(sib_state_list)
-
+      #paren_tm1_list = []
+      #last_word_list = []
+      #for i in range(batch_size):
+      #  paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
+      #  last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
+      #paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
+      #last_word_state = dy.concatenate_to_batch(last_word_list)
+      
+      paren_tm1_state = paren_tm1_states[0]
+      last_word_state = last_word_states[0]
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
-      #inp = dy.concatenate([inp, paren_tm1_state, sib_state])
       # get word_rnn state
       word_rnn_state = tree_dec_state.word_rnn_state
       if self.set_word_lstm:
@@ -341,8 +359,8 @@ class TreeDecoder(RnnDecoder, Serializable):
       open_nonterms=tree_dec_state.open_nonterms[:]
       new_open_nonterms = []
       for rhs in rule.rhs:
-        if new_open_nonterms:
-          new_open_nonterms[-1].is_sibling = True # sibling ends at the second to last child
+        #if new_open_nonterms:
+        #  new_open_nonterms[-1].is_sibling = True # sibling ends at the second to last child
         if rhs in rule.open_nonterms:
           #new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output(), sib_state=dy.zeros(self.lstm_dim)))
           new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output()))
@@ -353,7 +371,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state)
 
-  def get_scores(self, tree_dec_state, trg_rule_vocab=None):
+  def get_scores(self, tree_dec_state, trg_rule_vocab, label_idx=-1):
     """Get scores given a current state.
 
     :param mlp_dec_state: An MlpSoftmaxDecoderState object.
@@ -363,17 +381,18 @@ class TreeDecoder(RnnDecoder, Serializable):
     #  h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.word_rnn_state.output(), tree_dec_state.context])))
     #else:
     h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
-    if not trg_rule_vocab:
-      return self.vocab_projector(h_t)
+    if label_idx >= 0:
+      label = trg_rule_vocab.tag_vocab[label_idx]
+      valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
-      valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
-      valid_y_mask[valid_y_index] = 0.
-      return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index)
+    valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
+    valid_y_mask[valid_y_index] = 0.
+    return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index)
 
-  def calc_loss(self, tree_dec_state, ref_action):
-    scores = self.get_scores(tree_dec_state)
+  def calc_loss(self, tree_dec_state, ref_action, trg_rule_vocab):
     ref_word = ref_action.get_col(0)
+    scores, valid_size = self.get_scores(tree_dec_state, trg_rule_vocab, ref_action.get_col(5)[0])
     # single mode
     if not xnmt.batcher.is_batched(ref_action):
       return dy.pickneglogsoftmax(scores, ref_word)

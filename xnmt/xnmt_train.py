@@ -131,6 +131,7 @@ class XnmtTrainer(object):
       self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
     self.dev_src, self.dev_trg = \
       self.batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
+    pass
 
   def dynet_trainer_for_args(self, args, model_context):
     if args.trainer.lower() == "sgd":
@@ -342,7 +343,8 @@ class XnmtTrainer(object):
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
     #for i in range(1):
-      dy.renew_cg(immediate_compute=True)
+      #dy.renew_cg(immediate_compute=True)
+      dy.renew_cg()
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])

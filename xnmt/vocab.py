@@ -121,7 +121,6 @@ class RuleVocab(Vocab):
 
   def freeze(self):
     self.frozen = True
-    self.tag_vocab.freeze()
 
   def convert(self, w):
     ''' w is a Rule object'''

@@ -348,6 +348,8 @@ class TreeReader(BaseTextReader, Serializable):
     self.vocab.freeze()
     self.vocab.set_unk(Vocab.UNK_STR)
     self.overwrite_serialize_param("vocab", self.vocab)
+    self.vocab.tag_vocab.freeze()
+    self.vocab.set_unk(Vocab.UNK_STR)
 
   def vocab_size(self):
     return len(self.vocab)

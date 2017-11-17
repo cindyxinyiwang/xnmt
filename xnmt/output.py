@@ -38,10 +38,12 @@ class PlainTextOutputProcessor(OutputProcessor):
     return u" ".join(word_list)
 
 class RuleOutputProcessor(PlainTextOutputProcessor):
-  
+  def __init__(self, piece=True):
+    self.piece = piece
+
   def words_to_string(self, rule_list):
     tree = Tree.from_rule_deriv(rule_list)
-    return [tree.to_string(), tree.to_parse_string()]
+    return [tree.to_string(self.piece), tree.to_parse_string()]
 
 class JoinedCharTextOutputProcessor(PlainTextOutputProcessor):
   '''
@@ -69,11 +71,11 @@ class TreeOutputProcessor(PlainTextOutputProcessor):
   '''
   Assumes a Rule vocabulary and outputs the merged words;
   '''
-  def __init__(self, merge_indicator=u"@@"):
-    self.merge_indicator_with_space = merge_indicator + u" "
+  def __init__(self, piece=True):
+    self.piece = piece
 
   def words_to_string(self, word_list):
-    return Tree.from_rule_deriv(word_list).to_string()
+    return Tree.from_rule_deriv(word_list).to_string(self.piece)
 
 class JoinedBPETextOutputProcessor(PlainTextOutputProcessor):
   '''

@@ -139,7 +139,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       self.attender.init_sent(encodings)
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
       dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
-      return self.loss_calculator(self, dec_state, src, trg)
+      return self.loss_calculator(self, dec_state, src, trg, trg_rule_vocab=trg_rule_vocab)
 
   def generate(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None):
     if not xnmt.batcher.is_batched(src):

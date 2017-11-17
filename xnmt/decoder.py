@@ -386,6 +386,8 @@ class TreeDecoder(RnnDecoder, Serializable):
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
+    if not valid_y_index:
+      valid_y_index = [i for i in range(len(trg_rule_vocab))]
     valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
     valid_y_mask[valid_y_index] = 0.
     return self.vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index)

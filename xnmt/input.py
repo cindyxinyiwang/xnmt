@@ -340,7 +340,7 @@ class TreeReader(BaseTextReader, Serializable):
         yield TreeInput(tree.get_data_root(self.vocab))
     else:
       for line in self.iterate_filtered(filename[0], filter_ids):
-        tree = Tree(parse_root(tokenize(line)))
+        tree = Tree(parse_root(tokenize(line)), binarize=self.binarize)
         #yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5 ])
         yield TreeInput(tree.get_data_root(self.vocab))
 
@@ -349,7 +349,7 @@ class TreeReader(BaseTextReader, Serializable):
     self.vocab.set_unk(Vocab.UNK_STR)
     self.overwrite_serialize_param("vocab", self.vocab)
     self.vocab.tag_vocab.freeze()
-    self.vocab.set_unk(Vocab.UNK_STR)
+    self.vocab.tag_vocab.set_unk(Vocab.UNK_STR)
 
   def vocab_size(self):
     return len(self.vocab)

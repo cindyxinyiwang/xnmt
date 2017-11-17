@@ -27,7 +27,7 @@ options = [
   Option("ref_file", str, required=False, help_str="path of file with reference translations, e.g. for forced decoding"),
   Option("max_src_len", int, required=False, help_str="Remove sentences from data to decode that are longer than this on the source side"),
   Option("input_format", default_value="text", help_str="format of input data: text/contvec"),
-  Option("post_process", default_value="none", help_str="post-processing of translation outputs: none/join-char/join-bpe"),
+  Option("post_process", default_value="none", help_str="post-processing of translation outputs: none/join-char/join-bpe/rule-piece/rule"),
   Option("candidate_id_file", required=False, default_value=None, help_str="if we are doing something like retrieval where we select from fixed candidates, sometimes we want to limit our candidates to a certain subset of the full set. this setting allows us to do this."),
   Option("report_path", str, required=False, help_str="a path to which decoding reports will be written"),
   Option("report_type", str, default_value="html", required=False, help_str="report to generate file/html. Can be multiple, separate with comma."),
@@ -122,8 +122,10 @@ def output_processor_for_spec(spec):
     return JoinedBPETextOutputProcessor()
   elif spec == "join-piece":
     return JoinedPieceTextOutputProcessor()
+  elif spec == "rule-piece":
+    return RuleOutputProcessor(piece=True)
   elif spec == "rule":
-    return RuleOutputProcessor()
+    return RuleOutputProcessor(piece=False)
   else:
     raise RuntimeError("Unknown postprocessing argument {}".format(spec))
 

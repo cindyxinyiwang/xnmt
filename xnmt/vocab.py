@@ -143,6 +143,8 @@ class RuleVocab(Vocab):
 
 
 class Rule(object):
+
+  yaml_tag = "!Rule"
   def __init__(self, lhs, rhs=[], open_nonterms=[]):
     self.lhs = lhs
     self.rhs = rhs 

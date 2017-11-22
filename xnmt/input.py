@@ -682,6 +682,7 @@ def split_sent_piece(root, piece_l, word_idx):
       if len(piece) == 1:
         n = TreeNode(u'x', piece)
         n._parent = root
+        #n = piece[0]
         new_children.append(n)
         continue
       for p in piece:
@@ -689,6 +690,9 @@ def split_sent_piece(root, piece_l, word_idx):
         r = TreeNode(root.label + u"_sub", [n])
         r._parent = root 
         new_children.append(r)
+        #n = TreeNode(root.label, [p])
+        #n._parent = root
+        #new_children.append(n)
     else:
       word_idx = split_sent_piece(c, piece_l, word_idx)
       new_children.append(c)

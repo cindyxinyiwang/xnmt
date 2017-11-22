@@ -119,6 +119,11 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       
       ss = mark_as_batch([Vocab.SS])
       emb_ss = self.trg_embedder.embed(ss)
+      #self.start_sent()
+      #embeddings = self.src_embedder.embed_sent(src)
+      #encodings = self.encoder(embeddings)
+      #self.attender.init_sent(encodings)
+      #enc_final_state = self.encoder.get_final_states()
       for i in xrange(len(trg)):
         self.start_sent()
         embeddings = self.src_embedder.embed_sent(src[i])
@@ -128,8 +133,9 @@ class DefaultTranslator(Translator, Serializable, Reportable):
           single_trg = mark_as_batch([trg[i]], xnmt.batcher.Mask(np.expand_dims(trg.mask.np_arr[i], 0)))
         else:
           single_trg = mark_as_batch([trg[i]])
+        #dec_state = self.decoder.initial_state([final_state.pick_batch_elem(i) for final_state in enc_final_state], emb_ss)
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), emb_ss)
-        #print(single_trg)
+        #loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, pick_src_elem=i, trg_rule_vocab=trg_rule_vocab))
         loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, trg_rule_vocab=trg_rule_vocab))
       return dy.esum(loss)
     else:

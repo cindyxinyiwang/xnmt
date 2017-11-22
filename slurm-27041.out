@@ -1,0 +1,580 @@
+Singularity: Invoking an interactive shell within container...
+
+[0m/opt/cudnn-8.0/lib64:/home/xinyiw1/software/dynet-repo/dynet/build/dynet/:/projects/tir1/cuda-8.0.27.1/lib64:/opt/cudnn-5.1/lib64:/opt/cuda-8.0/lib64:/opt/cuda-8.0/lib:/home/xinyiw1/miniconda2/envs/research/lib:/opt/cuda-8.0/lib64/:/home/xinyiw1/gcc-5.2.0/lib64:/home/xinyiw1/boost_1_65_1/lib:/home/xinyiw1/gcc-5.2.0/lib:/opt/openmpi/lib
+[dynet] initializing CUDA
+Request for 1 GPU ...
+[dynet] Device Number: 0
+[dynet]   Device name: GeForce GTX 1080 Ti
+[dynet]   Memory Clock Rate (KHz): 5505000
+[dynet]   Memory Bus Width (bits): 352
+[dynet]   Peak Memory Bandwidth (GB/s): 484.44
+[dynet]   Memory Free (GB): 11.5421/11.7151
+[dynet]
+[dynet] Device(s) selected: 0
+[dynet] random seed: 2066621922
+[dynet] allocating memory: 10000MB
+[dynet] memory allocation done.
+=> Running oromo-seq-64
+   > Preprocessing   
+   > Training   
+   initialized BilingualTrainingCorpus({'train_src': '/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.orm', 'dev_trg': '/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.eng', 'dev_ref_file': '/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.eng', 'dev_src': '/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm', 'train_trg': '/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.eng'})   
+   initialized PlainTextReader({})   
+   initialized PlainTextReader({})   
+   initialized BilingualCorpusParser({'trg_reader': <xnmt.input.PlainTextReader object at 0x7f820e401090>, 'src_reader': <xnmt.input.PlainTextReader object at 0x7f820e401050>})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.orm   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.eng   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.eng   
+   initialized SimpleWordEmbedder({'vocab_size': 3004, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>})   
+   initialized LSTMSeqTransducer({'layers': 1, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>})   
+   initialized StandardAttender({'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>})   
+   initialized SimpleWordEmbedder({'vocab_size': 2998, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>})   
+   initialized CopyBridge({'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>, 'dec_layers': 1})   
+   initialized MlpSoftmaxDecoder({'layers': 1, 'bridge': <xnmt.decoder.CopyBridge object at 0x7f820ddece10>, 'yaml_context': <xnmt.model_context.ModelContext object at 0x7f820e3eed90>, 'mlp_hidden_dim': 512, 'vocab_size': 2998})   
+   initialized DefaultTranslator({'src_embedder': <xnmt.embedder.SimpleWordEmbedder object at 0x7f820ddecc50>, 'decoder': <xnmt.decoder.MlpSoftmaxDecoder object at 0x7f820ddecdd0>, 'trg_embedder': <xnmt.embedder.SimpleWordEmbedder object at 0x7f820ddecd90>, 'attender': <xnmt.attender.StandardAttender object at 0x7f820ddecd50>, 'encoder': <xnmt.lstm.LSTMSeqTransducer object at 0x7f820ddecc90>})   
+   initialized SrcBatcher({'batch_size': 64})   
+   Epoch 0.1712: train_loss/word=4.531 (words=48576, words/sec=11848.90, time=0-00:00:04)   
+   Epoch 0.3424: train_loss/word=4.271 (words=99520, words/sec=12140.42, time=0-00:00:08)   
+   Epoch 0.5078: train_loss/word=4.147 (words=157709, words/sec=10705.38, time=0-00:00:13)   
+   Epoch 0.6790: train_loss/word=4.117 (words=207309, words/sec=11558.22, time=0-00:00:18)   
+   Epoch 0.8395: train_loss/word=4.071 (words=256653, words/sec=11833.29, time=0-00:00:22)   
+   Epoch 1.0000: train_loss/word=4.014 (words=304525, words/sec=11784.61, time=0-00:00:26)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 1.0000 dev [auxiliary] Loss: 3.542   
+     Epoch 1.0000 dev BLEU4: 0.0, 0.153402/0.001238/0.000000/0.000000 (BP = 0.682094, ratio=0.72, hyp_len=7627, ref_len=10545) (words=22082, words/sec=695.38, time=0-00:00:58)   
+     Epoch 1.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 1.1712: train_loss/word=3.725 (words=50112, words/sec=4465.26, time=0-00:01:09)   
+   Epoch 1.3424: train_loss/word=3.656 (words=102720, words/sec=11814.43, time=0-00:01:13)   
+   Epoch 1.5029: train_loss/word=3.627 (words=156544, words/sec=11484.63, time=0-00:01:18)   
+   Epoch 1.6790: train_loss/word=3.597 (words=207757, words/sec=10945.93, time=0-00:01:23)   
+   Epoch 1.8395: train_loss/word=3.545 (words=259341, words/sec=11668.14, time=0-00:01:27)   
+   Epoch 2.0000: train_loss/word=3.501 (words=304525, words/sec=12113.25, time=0-00:01:31)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 2.0000 dev [auxiliary] Loss: 3.001   
+     Epoch 2.0000 dev BLEU4: 0.0, 0.112977/0.015543/0.001192/0.000000 (BP = 1.000000, ratio=1.02, hyp_len=10781, ref_len=10545) (words=22082, words/sec=399.16, time=0-00:02:26)   
+   Epoch 2.1712: train_loss/word=3.176 (words=49856, words/sec=11720.81, time=0-00:02:30)   
+   Epoch 2.3366: train_loss/word=3.159 (words=103437, words/sec=10876.37, time=0-00:02:35)   
+   Epoch 2.5078: train_loss/word=3.132 (words=157453, words/sec=11421.66, time=0-00:02:40)   
+   Epoch 2.6790: train_loss/word=3.074 (words=205965, words/sec=12192.47, time=0-00:02:44)   
+   Epoch 2.8395: train_loss/word=3.051 (words=253965, words/sec=11794.84, time=0-00:02:48)   
+   Epoch 3.0000: train_loss/word=3.027 (words=304525, words/sec=11799.31, time=0-00:02:52)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 3.0000 dev [auxiliary] Loss: 2.653   
+     Epoch 3.0000 dev BLEU4: 0.0302941105179, 0.212358/0.049484/0.013895/0.007629 (BP = 0.932481, ratio=0.93, hyp_len=9856, ref_len=10545) (words=22082, words/sec=544.89, time=0-00:03:33)   
+     Epoch 3.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 3.1712: train_loss/word=2.756 (words=50304, words/sec=4481.71, time=0-00:03:44)   
+   Epoch 3.3424: train_loss/word=2.816 (words=107328, words/sec=11300.10, time=0-00:03:49)   
+   Epoch 3.5029: train_loss/word=2.761 (words=161728, words/sec=11692.97, time=0-00:03:54)   
+   Epoch 3.6741: train_loss/word=2.746 (words=210176, words/sec=12178.17, time=0-00:03:58)   
+   Epoch 3.8395: train_loss/word=2.735 (words=258445, words/sec=10844.63, time=0-00:04:02)   
+   Epoch 4.0000: train_loss/word=2.731 (words=304525, words/sec=11605.74, time=0-00:04:06)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 4.0000 dev [auxiliary] Loss: 2.473   
+     Epoch 4.0000 dev BLEU4: 0.0332385745471, 0.247125/0.056366/0.015409/0.008925 (BP = 0.893424, ratio=0.90, hyp_len=9477, ref_len=10545) (words=22082, words/sec=614.06, time=0-00:04:42)   
+     Epoch 4.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 4.1712: train_loss/word=2.548 (words=52352, words/sec=3090.64, time=0-00:04:59)   
+   Epoch 4.3424: train_loss/word=2.552 (words=102592, words/sec=11857.26, time=0-00:05:03)   
+   Epoch 4.5029: train_loss/word=2.534 (words=152448, words/sec=11694.62, time=0-00:05:08)   
+   Epoch 4.6741: train_loss/word=2.542 (words=205632, words/sec=11712.83, time=0-00:05:12)   
+   Epoch 4.8453: train_loss/word=2.544 (words=254080, words/sec=11678.26, time=0-00:05:16)   
+   Epoch 5.0000: train_loss/word=2.539 (words=304525, words/sec=10941.91, time=0-00:05:21)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 5.0000 dev [auxiliary] Loss: 2.367   
+     Epoch 5.0000 dev BLEU4: 0.032622880444, 0.215569/0.054781/0.015496/0.008825 (BP = 0.915134, ratio=0.92, hyp_len=9686, ref_len=10545) (words=22082, words/sec=522.73, time=0-00:06:03)   
+   Epoch 5.1712: train_loss/word=2.458 (words=51968, words/sec=11613.82, time=0-00:06:08)   
+   Epoch 5.3424: train_loss/word=2.457 (words=103872, words/sec=11177.57, time=0-00:06:12)   
+   Epoch 5.5029: train_loss/word=2.443 (words=152704, words/sec=11855.33, time=0-00:06:16)   
+   Epoch 5.6741: train_loss/word=2.417 (words=205952, words/sec=12039.74, time=0-00:06:21)   
+   Epoch 5.8395: train_loss/word=2.410 (words=258573, words/sec=11221.33, time=0-00:06:25)   
+   Epoch 6.0000: train_loss/word=2.398 (words=304525, words/sec=11775.09, time=0-00:06:29)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 6.0000 dev [auxiliary] Loss: 2.285   
+     Epoch 6.0000 dev BLEU4: 0.0410430848732, 0.285002/0.072774/0.021517/0.011293 (BP = 0.866247, ratio=0.87, hyp_len=9221, ref_len=10545) (words=22082, words/sec=586.98, time=0-00:07:07)   
+     Epoch 6.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 6.1712: train_loss/word=2.293 (words=52032, words/sec=2828.47, time=0-00:07:25)   
+   Epoch 6.3424: train_loss/word=2.331 (words=113536, words/sec=11234.78, time=0-00:07:31)   
+   Epoch 6.5029: train_loss/word=2.317 (words=161280, words/sec=11967.35, time=0-00:07:35)   
+   Epoch 6.6741: train_loss/word=2.297 (words=203584, words/sec=12174.63, time=0-00:07:38)   
+   Epoch 6.8453: train_loss/word=2.295 (words=252928, words/sec=11835.76, time=0-00:07:42)   
+   Epoch 7.0000: train_loss/word=2.287 (words=304525, words/sec=10980.94, time=0-00:07:47)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 7.0000 dev [auxiliary] Loss: 2.233   
+     Epoch 7.0000 dev BLEU4: 0.0469327314148, 0.285670/0.076471/0.025430/0.012259 (BP = 0.918728, ratio=0.92, hyp_len=9721, ref_len=10545) (words=22082, words/sec=587.04, time=0-00:08:25)   
+     Epoch 7.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 7.1712: train_loss/word=2.236 (words=55168, words/sec=4644.33, time=0-00:08:37)   
+   Epoch 7.3424: train_loss/word=2.175 (words=103104, words/sec=12245.67, time=0-00:08:41)   
+   Epoch 7.5029: train_loss/word=2.162 (words=148288, words/sec=11772.05, time=0-00:08:44)   
+   Epoch 7.6741: train_loss/word=2.193 (words=204992, words/sec=11520.68, time=0-00:08:49)   
+   Epoch 7.8395: train_loss/word=2.183 (words=258061, words/sec=11056.95, time=0-00:08:54)   
+   Epoch 8.0000: train_loss/word=2.181 (words=304525, words/sec=11731.34, time=0-00:08:58)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 8.0000 dev [auxiliary] Loss: 2.177   
+     Epoch 8.0000 dev BLEU4: 0.0498806261801, 0.295182/0.081118/0.026968/0.012780 (BP = 0.930657, ratio=0.93, hyp_len=9838, ref_len=10545) (words=22082, words/sec=548.55, time=0-00:09:38)   
+     Epoch 8.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 8.1712: train_loss/word=2.107 (words=55168, words/sec=4682.57, time=0-00:09:50)   
+   Epoch 8.3424: train_loss/word=2.128 (words=112960, words/sec=11322.58, time=0-00:09:55)   
+   Epoch 8.5029: train_loss/word=2.115 (words=159232, words/sec=11852.08, time=0-00:09:59)   
+   Epoch 8.6790: train_loss/word=2.084 (words=209421, words/sec=11079.70, time=0-00:10:04)   
+   Epoch 8.8395: train_loss/word=2.095 (words=260877, words/sec=11760.16, time=0-00:10:08)   
+   Epoch 9.0000: train_loss/word=2.076 (words=304525, words/sec=12237.61, time=0-00:10:12)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 9.0000 dev [auxiliary] Loss: 2.123   
+     Epoch 9.0000 dev BLEU4: 0.062431073495, 0.320301/0.095310/0.034577/0.016272 (BP = 0.969775, ratio=0.97, hyp_len=10231, ref_len=10545) (words=22082, words/sec=557.90, time=0-00:10:51)   
+     Epoch 9.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 9.1712: train_loss/word=1.999 (words=53248, words/sec=2743.09, time=0-00:11:11)   
+   Epoch 9.3424: train_loss/word=1.977 (words=104128, words/sec=12044.77, time=0-00:11:15)   
+   Epoch 9.5078: train_loss/word=1.993 (words=160653, words/sec=10696.21, time=0-00:11:20)   
+   Epoch 9.6790: train_loss/word=1.983 (words=207949, words/sec=12105.28, time=0-00:11:24)   
+   Epoch 9.8395: train_loss/word=1.980 (words=258765, words/sec=11430.92, time=0-00:11:28)   
+   Epoch 10.0000: train_loss/word=1.976 (words=304525, words/sec=12049.73, time=0-00:11:32)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 10.0000 dev [auxiliary] Loss: 2.082   
+     Epoch 10.0000 dev BLEU4: 0.0666642254992, 0.346382/0.109214/0.038823/0.016987 (BP = 0.943257, ratio=0.94, hyp_len=9963, ref_len=10545) (words=22082, words/sec=577.59, time=0-00:12:10)   
+     Epoch 10.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 10.1712: train_loss/word=1.919 (words=53440, words/sec=4669.65, time=0-00:12:22)   
+   Epoch 10.3366: train_loss/word=1.895 (words=104653, words/sec=10760.50, time=0-00:12:27)   
+   Epoch 10.5078: train_loss/word=1.920 (words=164941, words/sec=11443.15, time=0-00:12:32)   
+   Epoch 10.6790: train_loss/word=1.884 (words=209037, words/sec=12106.51, time=0-00:12:36)   
+   Epoch 10.8395: train_loss/word=1.888 (words=258701, words/sec=11683.78, time=0-00:12:40)   
+   Epoch 11.0000: train_loss/word=1.883 (words=304525, words/sec=11976.28, time=0-00:12:44)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 11.0000 dev [auxiliary] Loss: 2.050   
+     Epoch 11.0000 dev BLEU4: 0.0725178973129, 0.361232/0.119099/0.044968/0.020456 (BP = 0.914311, ratio=0.92, hyp_len=9678, ref_len=10545) (words=22082, words/sec=573.52, time=0-00:13:22)   
+     Epoch 11.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 11.1761: train_loss/word=1.775 (words=54669, words/sec=4573.15, time=0-00:13:34)   
+   Epoch 11.3366: train_loss/word=1.731 (words=97933, words/sec=12221.76, time=0-00:13:38)   
+   Epoch 11.5078: train_loss/word=1.744 (words=147917, words/sec=11981.52, time=0-00:13:42)   
+   Epoch 11.6790: train_loss/word=1.731 (words=195533, words/sec=12198.38, time=0-00:13:46)   
+   Epoch 11.8395: train_loss/word=1.769 (words=253645, words/sec=11174.65, time=0-00:13:51)   
+   Epoch 12.0000: train_loss/word=1.791 (words=304525, words/sec=11503.39, time=0-00:13:55)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 12.0000 dev [auxiliary] Loss: 2.016   
+     Epoch 12.0000 dev BLEU4: 0.0736254951657, 0.374187/0.125228/0.045044/0.019858 (BP = 0.915031, ratio=0.92, hyp_len=9685, ref_len=10545) (words=22082, words/sec=593.48, time=0-00:14:33)   
+     Epoch 12.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 12.1712: train_loss/word=1.678 (words=52032, words/sec=2812.39, time=0-00:14:51)   
+   Epoch 12.3424: train_loss/word=1.635 (words=100096, words/sec=12207.42, time=0-00:14:55)   
+   Epoch 12.5078: train_loss/word=1.654 (words=152845, words/sec=11093.98, time=0-00:15:00)   
+   Epoch 12.6790: train_loss/word=1.685 (words=207885, words/sec=11287.65, time=0-00:15:05)   
+   Epoch 12.8395: train_loss/word=1.677 (words=254093, words/sec=11855.64, time=0-00:15:09)   
+   Epoch 13.0000: train_loss/word=1.701 (words=304525, words/sec=11430.15, time=0-00:15:13)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 13.0000 dev [auxiliary] Loss: 1.996   
+     Epoch 13.0000 dev BLEU4: 0.0868222134883, 0.371552/0.132262/0.053426/0.024909 (BP = 0.965468, ratio=0.97, hyp_len=10187, ref_len=10545) (words=22082, words/sec=571.65, time=0-00:15:52)   
+     Epoch 13.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 13.1712: train_loss/word=1.662 (words=54784, words/sec=4640.63, time=0-00:16:03)   
+   Epoch 13.3424: train_loss/word=1.655 (words=109440, words/sec=11756.39, time=0-00:16:08)   
+   Epoch 13.5029: train_loss/word=1.624 (words=155712, words/sec=11856.61, time=0-00:16:12)   
+   Epoch 13.6741: train_loss/word=1.632 (words=211712, words/sec=11678.88, time=0-00:16:17)   
+   Epoch 13.8453: train_loss/word=1.613 (words=257664, words/sec=12074.03, time=0-00:16:21)   
+   Epoch 14.0000: train_loss/word=1.613 (words=304525, words/sec=10945.43, time=0-00:16:25)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 14.0000 dev [auxiliary] Loss: 1.994   
+     Epoch 14.0000 dev BLEU4: 0.0879510646712, 0.389957/0.138090/0.057242/0.027778 (BP = 0.914311, ratio=0.92, hyp_len=9678, ref_len=10545) (words=22082, words/sec=592.51, time=0-00:17:02)   
+     Epoch 14.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 14.1761: train_loss/word=1.436 (words=52813, words/sec=4451.49, time=0-00:17:14)   
+   Epoch 14.3366: train_loss/word=1.425 (words=96013, words/sec=12195.35, time=0-00:17:17)   
+   Epoch 14.5078: train_loss/word=1.431 (words=145549, words/sec=12298.32, time=0-00:17:22)   
+   Epoch 14.6790: train_loss/word=1.465 (words=195661, words/sec=11521.98, time=0-00:17:26)   
+   Epoch 14.8395: train_loss/word=1.512 (words=253645, words/sec=10981.72, time=0-00:17:31)   
+   Epoch 15.0000: train_loss/word=1.527 (words=304525, words/sec=11712.54, time=0-00:17:35)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 15.0000 dev [auxiliary] Loss: 1.973   
+     Epoch 15.0000 dev BLEU4: 0.0898349976512, 0.394426/0.143112/0.057908/0.025824 (BP = 0.937228, ratio=0.94, hyp_len=9903, ref_len=10545) (words=22082, words/sec=590.83, time=0-00:18:13)   
+     Epoch 15.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 15.1712: train_loss/word=1.485 (words=54016, words/sec=3331.63, time=0-00:18:29)   
+   Epoch 15.3424: train_loss/word=1.435 (words=105792, words/sec=11881.06, time=0-00:18:33)   
+   Epoch 15.5029: train_loss/word=1.457 (words=158016, words/sec=11585.90, time=0-00:18:38)   
+   Epoch 15.6790: train_loss/word=1.451 (words=210317, words/sec=10834.38, time=0-00:18:43)   
+   Epoch 15.8395: train_loss/word=1.450 (words=257741, words/sec=11719.59, time=0-00:18:47)   
+   Epoch 16.0000: train_loss/word=1.443 (words=304525, words/sec=12242.83, time=0-00:18:51)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 16.0000 dev [auxiliary] Loss: 1.980   
+     Epoch 16.0000 dev BLEU4: 0.103405819917, 0.394115/0.150452/0.065935/0.033549 (BP = 0.966252, ratio=0.97, hyp_len=10195, ref_len=10545) (words=22082, words/sec=574.51, time=0-00:19:29)   
+     Epoch 16.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 16.1712: train_loss/word=1.549 (words=61632, words/sec=4976.54, time=0-00:19:41)   
+   Epoch 16.3424: train_loss/word=1.452 (words=114496, words/sec=11807.42, time=0-00:19:46)   
+   Epoch 16.5029: train_loss/word=1.389 (words=159296, words/sec=12317.50, time=0-00:19:50)   
+   Epoch 16.6741: train_loss/word=1.400 (words=214720, words/sec=11802.98, time=0-00:19:54)   
+   Epoch 16.8395: train_loss/word=1.372 (words=260941, words/sec=11160.78, time=0-00:19:58)   
+   Epoch 17.0000: train_loss/word=1.363 (words=304525, words/sec=11896.10, time=0-00:20:02)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 17.0000 dev [auxiliary] Loss: 1.994   
+     Epoch 17.0000 dev BLEU4: 0.102194839438, 0.416043/0.158429/0.067580/0.035906 (BP = 0.908738, ratio=0.91, hyp_len=9624, ref_len=10545) (words=22082, words/sec=600.94, time=0-00:20:39)   
+   Epoch 17.1712: train_loss/word=1.269 (words=55360, words/sec=11550.59, time=0-00:20:44)   
+   Epoch 17.3424: train_loss/word=1.243 (words=107264, words/sec=11672.17, time=0-00:20:48)   
+   Epoch 17.5078: train_loss/word=1.260 (words=158093, words/sec=10976.03, time=0-00:20:53)   
+   Epoch 17.6790: train_loss/word=1.278 (words=209421, words/sec=11981.19, time=0-00:20:57)   
+   Epoch 17.8395: train_loss/word=1.287 (words=256781, words/sec=11616.55, time=0-00:21:01)   
+   Epoch 18.0000: train_loss/word=1.287 (words=304525, words/sec=11742.06, time=0-00:21:05)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 18.0000 dev [auxiliary] Loss: 1.984   
+     Epoch 18.0000 dev BLEU4: 0.108640922348, 0.416465/0.162131/0.071553/0.037226 (BP = 0.938134, ratio=0.94, hyp_len=9912, ref_len=10545) (words=22082, words/sec=589.77, time=0-00:21:43)   
+     Epoch 18.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 18.1761: train_loss/word=1.246 (words=55501, words/sec=2787.86, time=0-00:22:02)   
+   Epoch 18.3366: train_loss/word=1.248 (words=106573, words/sec=11423.91, time=0-00:22:07)   
+   Epoch 18.5078: train_loss/word=1.214 (words=157005, words/sec=12048.10, time=0-00:22:11)   
+   Epoch 18.6790: train_loss/word=1.213 (words=209293, words/sec=11693.00, time=0-00:22:16)   
+   Epoch 18.8395: train_loss/word=1.226 (words=262797, words/sec=11916.79, time=0-00:22:20)   
+   Epoch 19.0000: train_loss/word=1.212 (words=304525, words/sec=12196.80, time=0-00:22:24)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 19.0000 dev [auxiliary] Loss: 1.984   
+     Epoch 19.0000 dev BLEU4: 0.112793543404, 0.414927/0.163971/0.072897/0.036617 (BP = 0.971630, ratio=0.97, hyp_len=10250, ref_len=10545) (words=22082, words/sec=575.93, time=0-00:23:02)   
+     Epoch 19.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 19.1712: train_loss/word=1.054 (words=47936, words/sec=4491.77, time=0-00:23:13)   
+   Epoch 19.3424: train_loss/word=1.079 (words=96832, words/sec=11707.06, time=0-00:23:17)   
+   Epoch 19.5029: train_loss/word=1.130 (words=152256, words/sec=11320.24, time=0-00:23:22)   
+   Epoch 19.6741: train_loss/word=1.133 (words=203392, words/sec=11581.75, time=0-00:23:26)   
+   Epoch 19.8395: train_loss/word=1.139 (words=254861, words/sec=10960.23, time=0-00:23:31)   
+   Epoch 20.0000: train_loss/word=1.143 (words=304525, words/sec=12028.73, time=0-00:23:35)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 20.0000 dev [auxiliary] Loss: 2.010   
+     Epoch 20.0000 dev BLEU4: 0.113749547457, 0.431792/0.170821/0.079021/0.042100 (BP = 0.908842, ratio=0.91, hyp_len=9625, ref_len=10545) (words=22082, words/sec=605.58, time=0-00:24:11)   
+     Epoch 20.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 20.1712: train_loss/word=0.995 (words=49472, words/sec=4422.93, time=0-00:24:22)   
+   Epoch 20.3366: train_loss/word=1.035 (words=101069, words/sec=10962.37, time=0-00:24:27)   
+   Epoch 20.5078: train_loss/word=1.072 (words=158861, words/sec=11805.53, time=0-00:24:32)   
+   Epoch 20.6790: train_loss/word=1.047 (words=205005, words/sec=11947.21, time=0-00:24:36)   
+   Epoch 20.8395: train_loss/word=1.073 (words=256013, words/sec=11309.63, time=0-00:24:40)   
+   Epoch 21.0000: train_loss/word=1.077 (words=304525, words/sec=11689.96, time=0-00:24:45)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 21.0000 dev [auxiliary] Loss: 2.024   
+     Epoch 21.0000 dev BLEU4: 0.11433266355, 0.427687/0.171100/0.075567/0.038122 (BP = 0.948854, ratio=0.95, hyp_len=10019, ref_len=10545) (words=22082, words/sec=588.52, time=0-00:25:22)   
+     Epoch 21.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 21.1712: train_loss/word=0.933 (words=50944, words/sec=4565.57, time=0-00:25:33)   
+   Epoch 21.3424: train_loss/word=0.958 (words=102592, words/sec=11964.49, time=0-00:25:38)   
+   Epoch 21.5029: train_loss/word=1.019 (words=155264, words/sec=11273.64, time=0-00:25:42)   
+   Epoch 21.6741: train_loss/word=1.012 (words=206976, words/sec=11689.28, time=0-00:25:47)   
+   Epoch 21.8395: train_loss/word=1.010 (words=255757, words/sec=10866.52, time=0-00:25:51)   
+   Epoch 22.0000: train_loss/word=1.010 (words=304525, words/sec=11819.86, time=0-00:25:55)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 22.0000 dev [auxiliary] Loss: 2.042   
+     Epoch 22.0000 dev BLEU4: 0.116305166882, 0.433546/0.173065/0.079601/0.042715 (BP = 0.920265, ratio=0.92, hyp_len=9736, ref_len=10545) (words=22082, words/sec=604.16, time=0-00:26:32)   
+     Epoch 22.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 22.1712: train_loss/word=0.909 (words=54592, words/sec=4811.46, time=0-00:26:43)   
+   Epoch 22.3424: train_loss/word=0.809 (words=96832, words/sec=12605.84, time=0-00:26:47)   
+   Epoch 22.5078: train_loss/word=0.881 (words=151693, words/sec=11031.03, time=0-00:26:52)   
+   Epoch 22.6790: train_loss/word=0.921 (words=206349, words/sec=11363.15, time=0-00:26:56)   
+   Epoch 22.8395: train_loss/word=0.922 (words=252493, words/sec=11794.94, time=0-00:27:00)   
+   Epoch 23.0000: train_loss/word=0.947 (words=304525, words/sec=11269.74, time=0-00:27:05)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 23.0000 dev [auxiliary] Loss: 2.070   
+     Epoch 23.0000 dev BLEU4: 0.115279163676, 0.429172/0.166130/0.075380/0.041054 (BP = 0.945860, ratio=0.95, hyp_len=9989, ref_len=10545) (words=22082, words/sec=585.09, time=0-00:27:43)   
+   Epoch 23.1712: train_loss/word=0.786 (words=47296, words/sec=12141.47, time=0-00:27:47)   
+   Epoch 23.3424: train_loss/word=0.861 (words=103808, words/sec=11438.53, time=0-00:27:51)   
+   Epoch 23.5029: train_loss/word=0.866 (words=151104, words/sec=11774.45, time=0-00:27:55)   
+   Epoch 23.6741: train_loss/word=0.855 (words=202624, words/sec=12122.15, time=0-00:28:00)   
+   Epoch 23.8453: train_loss/word=0.898 (words=259712, words/sec=11332.40, time=0-00:28:05)   
+   Epoch 24.0000: train_loss/word=0.892 (words=304525, words/sec=10798.75, time=0-00:28:09)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 24.0000 dev [auxiliary] Loss: 2.106   
+     Epoch 24.0000 dev BLEU4: 0.117266612101, 0.436218/0.173175/0.081467/0.045492 (BP = 0.906563, ratio=0.91, hyp_len=9603, ref_len=10545) (words=22082, words/sec=621.02, time=0-00:28:44)   
+     Epoch 24.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 24.1712: train_loss/word=0.711 (words=50304, words/sec=2616.70, time=0-00:29:04)   
+   Epoch 24.3424: train_loss/word=0.752 (words=100416, words/sec=11776.66, time=0-00:29:08)   
+   Epoch 24.5029: train_loss/word=0.811 (words=152960, words/sec=11353.00, time=0-00:29:13)   
+   Epoch 24.6741: train_loss/word=0.846 (words=209728, words/sec=11386.10, time=0-00:29:18)   
+   Epoch 24.8453: train_loss/word=0.845 (words=260416, words/sec=11932.61, time=0-00:29:22)   
+   Epoch 25.0000: train_loss/word=0.833 (words=304525, words/sec=10987.94, time=0-00:29:26)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 25.0000 dev [auxiliary] Loss: 2.118   
+     Epoch 25.0000 dev BLEU4: 0.119005492494, 0.434481/0.171772/0.077310/0.039019 (BP = 0.971532, ratio=0.97, hyp_len=10249, ref_len=10545) (words=22082, words/sec=588.50, time=0-00:30:03)   
+     Epoch 25.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 25.1712: train_loss/word=0.677 (words=47872, words/sec=3349.86, time=0-00:30:18)   
+   Epoch 25.3424: train_loss/word=0.691 (words=96832, words/sec=11904.29, time=0-00:30:22)   
+   Epoch 25.5029: train_loss/word=0.779 (words=154624, words/sec=11213.90, time=0-00:30:27)   
+   Epoch 25.6741: train_loss/word=0.780 (words=206016, words/sec=11754.17, time=0-00:30:31)   
+   Epoch 25.8453: train_loss/word=0.783 (words=258496, words/sec=11915.75, time=0-00:30:36)   
+   Epoch 26.0000: train_loss/word=0.783 (words=304525, words/sec=10825.78, time=0-00:30:40)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 26.0000 dev [auxiliary] Loss: 2.144   
+     Epoch 26.0000 dev BLEU4: 0.1167823298, 0.429837/0.166871/0.075693/0.039833 (BP = 0.963012, ratio=0.96, hyp_len=10162, ref_len=10545) (words=22082, words/sec=593.98, time=0-00:31:17)   
+   Epoch 26.1761: train_loss/word=0.726 (words=54477, words/sec=10868.41, time=0-00:31:22)   
+   Epoch 26.3366: train_loss/word=0.737 (words=102285, words/sec=11638.03, time=0-00:31:26)   
+   Epoch 26.5078: train_loss/word=0.724 (words=154445, words/sec=11905.93, time=0-00:31:31)   
+   Epoch 26.6790: train_loss/word=0.737 (words=207437, words/sec=11484.15, time=0-00:31:35)   
+   Epoch 26.8395: train_loss/word=0.747 (words=260365, words/sec=11704.50, time=0-00:31:40)   
+   Epoch 27.0000: train_loss/word=0.731 (words=304525, words/sec=12092.85, time=0-00:31:43)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 27.0000 dev [auxiliary] Loss: 2.171   
+     Epoch 27.0000 dev BLEU4: 0.119148493323, 0.437388/0.170520/0.078028/0.042243 (BP = 0.951542, ratio=0.95, hyp_len=10046, ref_len=10545) (words=22082, words/sec=596.51, time=0-00:32:20)   
+     Epoch 27.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 27.1712: train_loss/word=0.693 (words=55168, words/sec=2919.54, time=0-00:32:39)   
+   Epoch 27.3424: train_loss/word=0.727 (words=112192, words/sec=11488.04, time=0-00:32:44)   
+   Epoch 27.5029: train_loss/word=0.681 (words=156288, words/sec=12331.89, time=0-00:32:48)   
+   Epoch 27.6741: train_loss/word=0.655 (words=201792, words/sec=12324.14, time=0-00:32:52)   
+   Epoch 27.8395: train_loss/word=0.681 (words=258829, words/sec=10747.20, time=0-00:32:57)   
+   Epoch 28.0000: train_loss/word=0.684 (words=304525, words/sec=11511.46, time=0-00:33:01)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 28.0000 dev [auxiliary] Loss: 2.191   
+     Epoch 28.0000 dev BLEU4: 0.121196489133, 0.436049/0.170646/0.081069/0.044629 (BP = 0.946159, ratio=0.95, hyp_len=9992, ref_len=10545) (words=22082, words/sec=596.77, time=0-00:33:38)   
+     Epoch 28.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 28.1712: train_loss/word=0.668 (words=53504, words/sec=2697.23, time=0-00:33:58)   
+   Epoch 28.3424: train_loss/word=0.643 (words=105024, words/sec=11654.86, time=0-00:34:02)   
+   Epoch 28.5029: train_loss/word=0.667 (words=157888, words/sec=11805.72, time=0-00:34:07)   
+   Epoch 28.6741: train_loss/word=0.658 (words=212160, words/sec=11848.67, time=0-00:34:11)   
+   Epoch 28.8453: train_loss/word=0.644 (words=257408, words/sec=11978.98, time=0-00:34:15)   
+   Epoch 29.0000: train_loss/word=0.639 (words=304525, words/sec=11038.84, time=0-00:34:19)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 29.0000 dev [auxiliary] Loss: 2.232   
+     Epoch 29.0000 dev BLEU4: 0.125335803404, 0.443018/0.175234/0.083658/0.047897 (BP = 0.943758, ratio=0.95, hyp_len=9968, ref_len=10545) (words=22082, words/sec=598.73, time=0-00:34:56)   
+     Epoch 29.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 29.1712: train_loss/word=0.560 (words=51968, words/sec=4501.59, time=0-00:35:08)   
+   Epoch 29.3424: train_loss/word=0.552 (words=102592, words/sec=11952.13, time=0-00:35:12)   
+   Epoch 29.5029: train_loss/word=0.598 (words=152896, words/sec=11322.92, time=0-00:35:16)   
+   Epoch 29.6790: train_loss/word=0.605 (words=212557, words/sec=10925.56, time=0-00:35:22)   
+   Epoch 29.8395: train_loss/word=0.598 (words=259149, words/sec=12101.86, time=0-00:35:26)   
+   Epoch 30.0000: train_loss/word=0.599 (words=304525, words/sec=11784.09, time=0-00:35:29)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 30.0000 dev [auxiliary] Loss: 2.258   
+     Epoch 30.0000 dev BLEU4: 0.118170469241, 0.422051/0.164045/0.075732/0.041295 (BP = 0.974162, ratio=0.97, hyp_len=10276, ref_len=10545) (words=22082, words/sec=580.63, time=0-00:36:08)   
+   Epoch 30.1712: train_loss/word=0.459 (words=48064, words/sec=11852.45, time=0-00:36:12)   
+   Epoch 30.3424: train_loss/word=0.523 (words=100800, words/sec=11567.72, time=0-00:36:16)   
+   Epoch 30.5078: train_loss/word=0.563 (words=155277, words/sec=10447.86, time=0-00:36:21)   
+   Epoch 30.6790: train_loss/word=0.555 (words=204813, words/sec=11891.28, time=0-00:36:25)   
+   Epoch 30.8395: train_loss/word=0.550 (words=253581, words/sec=12419.84, time=0-00:36:29)   
+   Epoch 31.0000: train_loss/word=0.558 (words=304525, words/sec=11669.46, time=0-00:36:34)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 31.0000 dev [auxiliary] Loss: 2.294   
+     Epoch 31.0000 dev BLEU4: 0.120139003032, 0.431346/0.170695/0.077956/0.040772 (BP = 0.971337, ratio=0.97, hyp_len=10247, ref_len=10545) (words=22082, words/sec=588.62, time=0-00:37:11)   
+   Epoch 31.1712: train_loss/word=0.495 (words=51904, words/sec=11589.58, time=0-00:37:16)   
+   Epoch 31.3424: train_loss/word=0.450 (words=98560, words/sec=12495.58, time=0-00:37:20)   
+   Epoch 31.5029: train_loss/word=0.497 (words=150592, words/sec=11396.80, time=0-00:37:24)   
+   Epoch 31.6741: train_loss/word=0.511 (words=204032, words/sec=11614.03, time=0-00:37:29)   
+   Epoch 31.8453: train_loss/word=0.508 (words=255296, words/sec=12021.73, time=0-00:37:33)   
+   Epoch 32.0000: train_loss/word=0.521 (words=304525, words/sec=10607.26, time=0-00:37:38)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 32.0000 dev [auxiliary] Loss: 2.329   
+     Epoch 32.0000 dev BLEU4: 0.12033188006, 0.436942/0.170629/0.081657/0.045392 (BP = 0.933290, ratio=0.94, hyp_len=9864, ref_len=10545) (words=22082, words/sec=605.41, time=0-00:38:14)   
+   Epoch 32.1712: train_loss/word=0.592 (words=56192, words/sec=11169.27, time=0-00:38:19)   
+   Epoch 32.3424: train_loss/word=0.492 (words=104128, words/sec=11965.77, time=0-00:38:23)   
+   Epoch 32.5029: train_loss/word=0.471 (words=149184, words/sec=11945.31, time=0-00:38:27)   
+   Epoch 32.6741: train_loss/word=0.477 (words=201280, words/sec=11746.79, time=0-00:38:31)   
+   Epoch 32.8453: train_loss/word=0.465 (words=251520, words/sec=12252.94, time=0-00:38:35)   
+   Epoch 33.0000: train_loss/word=0.488 (words=304525, words/sec=10716.81, time=0-00:38:40)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 33.0000 dev [auxiliary] Loss: 2.355   
+     Epoch 33.0000 dev BLEU4: 0.117527905244, 0.431462/0.170268/0.076758/0.041532 (BP = 0.950050, ratio=0.95, hyp_len=10031, ref_len=10545) (words=22082, words/sec=599.58, time=0-00:39:17)   
+   Epoch 33.1712: train_loss/word=0.322 (words=45696, words/sec=12213.86, time=0-00:39:21)   
+   Epoch 33.3424: train_loss/word=0.442 (words=103872, words/sec=11363.62, time=0-00:39:26)   
+   Epoch 33.5029: train_loss/word=0.467 (words=156288, words/sec=11410.68, time=0-00:39:31)   
+   Epoch 33.6790: train_loss/word=0.468 (words=212173, words/sec=10946.87, time=0-00:39:36)   
+   Epoch 33.8395: train_loss/word=0.468 (words=261709, words/sec=11828.06, time=0-00:39:40)   
+   Epoch 34.0000: train_loss/word=0.455 (words=304525, words/sec=12094.98, time=0-00:39:43)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 34.0000 dev [auxiliary] Loss: 2.390   
+     Epoch 34.0000 dev BLEU4: 0.123290935986, 0.430894/0.169842/0.079555/0.043098 (BP = 0.979595, ratio=0.98, hyp_len=10332, ref_len=10545) (words=22082, words/sec=578.48, time=0-00:40:22)   
+     new learning rate: 0.000500000023749   
+   Epoch 34.1761: train_loss/word=0.329 (words=51213, words/sec=11129.63, time=0-00:40:26)   
+   Epoch 34.3366: train_loss/word=0.395 (words=103181, words/sec=11179.37, time=0-00:40:31)   
+   Epoch 34.5078: train_loss/word=0.381 (words=151693, words/sec=12090.37, time=0-00:40:35)   
+   Epoch 34.6790: train_loss/word=0.386 (words=205517, words/sec=11655.67, time=0-00:40:40)   
+   Epoch 34.8395: train_loss/word=0.384 (words=255565, words/sec=11850.65, time=0-00:40:44)   
+   Epoch 35.0000: train_loss/word=0.391 (words=304525, words/sec=11684.58, time=0-00:40:48)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 35.0000 dev [auxiliary] Loss: 2.401   
+     Epoch 35.0000 dev BLEU4: 0.117372605446, 0.434607/0.166684/0.075518/0.040852 (BP = 0.959959, ratio=0.96, hyp_len=10131, ref_len=10545) (words=22082, words/sec=587.22, time=0-00:41:26)   
+     new learning rate: 0.000250000011874   
+   Epoch 35.1712: train_loss/word=0.232 (words=45504, words/sec=12394.29, time=0-00:41:29)   
+   Epoch 35.3424: train_loss/word=0.239 (words=91264, words/sec=12151.86, time=0-00:41:33)   
+   Epoch 35.5029: train_loss/word=0.271 (words=142272, words/sec=11791.14, time=0-00:41:37)   
+   Epoch 35.6741: train_loss/word=0.337 (words=202048, words/sec=10994.12, time=0-00:41:43)   
+   Epoch 35.8395: train_loss/word=0.346 (words=256397, words/sec=10930.81, time=0-00:41:48)   
+   Epoch 36.0000: train_loss/word=0.348 (words=304525, words/sec=11674.09, time=0-00:41:52)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 36.0000 dev [auxiliary] Loss: 2.409   
+     Epoch 36.0000 dev BLEU4: 0.125481705445, 0.436506/0.173913/0.083440/0.047386 (BP = 0.953330, ratio=0.95, hyp_len=10064, ref_len=10545) (words=22082, words/sec=589.75, time=0-00:42:29)   
+     Epoch 36.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 36.1712: train_loss/word=0.221 (words=45952, words/sec=4262.02, time=0-00:42:40)   
+   Epoch 36.3424: train_loss/word=0.313 (words=101696, words/sec=11435.14, time=0-00:42:45)   
+   Epoch 36.5029: train_loss/word=0.351 (words=158016, words/sec=11437.06, time=0-00:42:50)   
+   Epoch 36.6741: train_loss/word=0.361 (words=212416, words/sec=11445.63, time=0-00:42:55)   
+   Epoch 36.8395: train_loss/word=0.331 (words=252749, words/sec=11223.87, time=0-00:42:58)   
+   Epoch 37.0000: train_loss/word=0.331 (words=304525, words/sec=11908.68, time=0-00:43:03)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 37.0000 dev [auxiliary] Loss: 2.430   
+     Epoch 37.0000 dev BLEU4: 0.119279534641, 0.439413/0.169800/0.077637/0.041801 (BP = 0.956204, ratio=0.96, hyp_len=10093, ref_len=10545) (words=22082, words/sec=593.49, time=0-00:43:40)   
+   Epoch 37.1712: train_loss/word=0.289 (words=50496, words/sec=11988.59, time=0-00:43:44)   
+   Epoch 37.3424: train_loss/word=0.310 (words=104256, words/sec=11581.02, time=0-00:43:49)   
+   Epoch 37.5029: train_loss/word=0.310 (words=150144, words/sec=11576.50, time=0-00:43:53)   
+   Epoch 37.6790: train_loss/word=0.317 (words=205837, words/sec=10761.98, time=0-00:43:58)   
+   Epoch 37.8395: train_loss/word=0.317 (words=258957, words/sec=11930.12, time=0-00:44:02)   
+   Epoch 38.0000: train_loss/word=0.318 (words=304525, words/sec=11827.16, time=0-00:44:06)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 38.0000 dev [auxiliary] Loss: 2.447   
+     Epoch 38.0000 dev BLEU4: 0.123529343744, 0.442424/0.172456/0.080311/0.045007 (BP = 0.958577, ratio=0.96, hyp_len=10117, ref_len=10545) (words=22082, words/sec=592.79, time=0-00:44:43)   
+   Epoch 38.1712: train_loss/word=0.337 (words=52992, words/sec=11456.19, time=0-00:44:48)   
+   Epoch 38.3424: train_loss/word=0.327 (words=104576, words/sec=11653.76, time=0-00:44:52)   
+   Epoch 38.5029: train_loss/word=0.332 (words=156224, words/sec=11402.34, time=0-00:44:57)   
+   Epoch 38.6741: train_loss/word=0.326 (words=208448, words/sec=11946.22, time=0-00:45:01)   
+   Epoch 38.8453: train_loss/word=0.306 (words=257792, words/sec=12179.95, time=0-00:45:05)   
+   Epoch 39.0000: train_loss/word=0.308 (words=304525, words/sec=10877.55, time=0-00:45:10)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 39.0000 dev [auxiliary] Loss: 2.459   
+     Epoch 39.0000 dev BLEU4: 0.121238452634, 0.440444/0.170797/0.078680/0.043845 (BP = 0.955214, ratio=0.96, hyp_len=10083, ref_len=10545) (words=22082, words/sec=592.88, time=0-00:45:47)   
+   Epoch 39.1712: train_loss/word=0.311 (words=49344, words/sec=11579.67, time=0-00:45:51)   
+   Epoch 39.3366: train_loss/word=0.320 (words=102221, words/sec=10739.90, time=0-00:45:56)   
+   Epoch 39.5078: train_loss/word=0.304 (words=152909, words/sec=11762.18, time=0-00:46:00)   
+   Epoch 39.6790: train_loss/word=0.284 (words=200973, words/sec=12170.94, time=0-00:46:04)   
+   Epoch 39.8395: train_loss/word=0.291 (words=253773, words/sec=11728.92, time=0-00:46:09)   
+   Epoch 40.0000: train_loss/word=0.298 (words=304525, words/sec=11683.86, time=0-00:46:13)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 40.0000 dev [auxiliary] Loss: 2.479   
+     Epoch 40.0000 dev BLEU4: 0.127092222446, 0.440495/0.175148/0.083333/0.046762 (BP = 0.965173, ratio=0.97, hyp_len=10184, ref_len=10545) (words=22082, words/sec=591.23, time=0-00:46:51)   
+     Epoch 40.0000: best dev score, writing model to examples/output/oromo-seq-64.mod   
+   Epoch 40.1712: train_loss/word=0.198 (words=51904, words/sec=4186.51, time=0-00:47:03)   
+   Epoch 40.3424: train_loss/word=0.206 (words=98240, words/sec=12160.38, time=0-00:47:07)   
+   Epoch 40.5078: train_loss/word=0.268 (words=153869, words/sec=10500.35, time=0-00:47:12)   
+   Epoch 40.6790: train_loss/word=0.275 (words=205773, words/sec=11589.24, time=0-00:47:16)   
+   Epoch 40.8395: train_loss/word=0.283 (words=254541, words/sec=11717.36, time=0-00:47:21)   
+   Epoch 41.0000: train_loss/word=0.288 (words=304525, words/sec=11612.16, time=0-00:47:25)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 41.0000 dev [auxiliary] Loss: 2.496   
+     Epoch 41.0000 dev BLEU4: 0.124882637056, 0.445733/0.174597/0.081937/0.045702 (BP = 0.955808, ratio=0.96, hyp_len=10089, ref_len=10545) (words=22082, words/sec=592.97, time=0-00:48:02)   
+   Epoch 41.1712: train_loss/word=0.226 (words=47296, words/sec=11835.74, time=0-00:48:06)   
+   Epoch 41.3424: train_loss/word=0.273 (words=104576, words/sec=11529.09, time=0-00:48:11)   
+   Epoch 41.5029: train_loss/word=0.284 (words=156864, words/sec=11777.61, time=0-00:48:16)   
+   Epoch 41.6790: train_loss/word=0.280 (words=208909, words/sec=10864.79, time=0-00:48:20)   
+   Epoch 41.8395: train_loss/word=0.267 (words=253901, words/sec=12133.07, time=0-00:48:24)   
+   Epoch 42.0000: train_loss/word=0.278 (words=304525, words/sec=11537.27, time=0-00:48:28)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 42.0000 dev [auxiliary] Loss: 2.507   
+     Epoch 42.0000 dev BLEU4: 0.122803783599, 0.440606/0.172722/0.079587/0.044750 (BP = 0.957095, ratio=0.96, hyp_len=10102, ref_len=10545) (words=22082, words/sec=592.00, time=0-00:49:06)   
+   Epoch 42.1712: train_loss/word=0.362 (words=56896, words/sec=11300.06, time=0-00:49:11)   
+   Epoch 42.3366: train_loss/word=0.315 (words=107661, words/sec=10903.44, time=0-00:49:15)   
+   Epoch 42.5078: train_loss/word=0.296 (words=158413, words/sec=11784.28, time=0-00:49:20)   
+   Epoch 42.6790: train_loss/word=0.291 (words=210829, words/sec=11626.18, time=0-00:49:24)   
+   Epoch 42.8395: train_loss/word=0.278 (words=255629, words/sec=12093.02, time=0-00:49:28)   
+   Epoch 43.0000: train_loss/word=0.271 (words=304525, words/sec=11996.70, time=0-00:49:32)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 43.0000 dev [auxiliary] Loss: 2.525   
+     Epoch 43.0000 dev BLEU4: 0.125003594936, 0.435481/0.172382/0.080964/0.045733 (BP = 0.968113, ratio=0.97, hyp_len=10214, ref_len=10545) (words=22082, words/sec=588.08, time=0-00:50:10)   
+   Epoch 43.1761: train_loss/word=0.315 (words=58957, words/sec=10783.90, time=0-00:50:15)   
+   Epoch 43.3366: train_loss/word=0.249 (words=102925, words/sec=12198.64, time=0-00:50:19)   
+   Epoch 43.5078: train_loss/word=0.252 (words=152845, words/sec=11422.47, time=0-00:50:23)   
+   Epoch 43.6790: train_loss/word=0.238 (words=203725, words/sec=12183.88, time=0-00:50:27)   
+   Epoch 43.8395: train_loss/word=0.243 (words=249741, words/sec=11929.02, time=0-00:50:31)   
+   Epoch 44.0000: train_loss/word=0.262 (words=304525, words/sec=11362.80, time=0-00:50:36)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 44.0000 dev [auxiliary] Loss: 2.539   
+     Epoch 44.0000 dev BLEU4: 0.120867487331, 0.435149/0.168325/0.078276/0.042479 (BP = 0.967526, ratio=0.97, hyp_len=10208, ref_len=10545) (words=22082, words/sec=587.40, time=0-00:51:14)   
+   Epoch 44.1712: train_loss/word=0.301 (words=53440, words/sec=11437.66, time=0-00:51:18)   
+   Epoch 44.3424: train_loss/word=0.256 (words=100480, words/sec=11936.99, time=0-00:51:22)   
+   Epoch 44.5029: train_loss/word=0.224 (words=144896, words/sec=12480.29, time=0-00:51:26)   
+   Epoch 44.6741: train_loss/word=0.227 (words=195584, words/sec=11749.22, time=0-00:51:30)   
+   Epoch 44.8395: train_loss/word=0.237 (words=249357, words/sec=10757.69, time=0-00:51:35)   
+   Epoch 45.0000: train_loss/word=0.255 (words=304525, words/sec=11490.41, time=0-00:51:40)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 45.0000 dev [auxiliary] Loss: 2.551   
+     Epoch 45.0000 dev BLEU4: 0.123264775005, 0.438459/0.173741/0.079680/0.043037 (BP = 0.969580, ratio=0.97, hyp_len=10229, ref_len=10545) (words=22082, words/sec=586.81, time=0-00:52:17)   
+     new learning rate: 0.000125000005937   
+   Epoch 45.1712: train_loss/word=0.214 (words=48448, words/sec=11875.05, time=0-00:52:22)   
+   Epoch 45.3366: train_loss/word=0.238 (words=103693, words/sec=10935.36, time=0-00:52:27)   
+   Epoch 45.5078: train_loss/word=0.256 (words=156493, words/sec=11442.02, time=0-00:52:31)   
+   Epoch 45.6790: train_loss/word=0.231 (words=199437, words/sec=12212.11, time=0-00:52:35)   
+   Epoch 45.8395: train_loss/word=0.244 (words=253517, words/sec=11552.79, time=0-00:52:39)   
+   Epoch 46.0000: train_loss/word=0.243 (words=304525, words/sec=11721.22, time=0-00:52:44)   
+   initialized PolynomialNormalization({'apply_during_search': True})   
+   /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.nltk.piece.orm   
+   > Checkpoint   
+     Epoch 46.0000 dev [auxiliary] Loss: 2.560   
+     Epoch 46.0000 dev BLEU4: 0.125173808219, 0.438572/0.173661/0.082569/0.044712 (BP = 0.966644, ratio=0.97, hyp_len=10199, ref_len=10545) (words=22082, words/sec=588.45, time=0-00:53:21)   
+     Early stopping   
+   reverting learned weights to best checkpoint..   
+   > Evaluating test set   
+     initialized PolynomialNormalization({'apply_during_search': True})     
+     /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.nltk.piece.orm     
+     BLEU4: 0.094241100449, 0.399819/0.139800/0.057924/0.026975 (BP = 0.974861, ratio=0.98, hyp_len=9937, ref_len=10190)     
+
+Experiment                    | Final Scores                           
+-----------------------------------------------------------------------
+oromo-seq-64                  | BLEU4: 0.094241100449, 0.399819/0.139800/0.057924/0.026975 (BP = 0.974861, ratio=0.98, hyp_len=9937, ref_len=10190)

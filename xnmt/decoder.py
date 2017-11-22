@@ -382,6 +382,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     #else:
     h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:
+      return self.vocab_projector(h_t), 0
       label = trg_rule_vocab.tag_vocab[label_idx]
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:
@@ -394,7 +395,7 @@ class TreeDecoder(RnnDecoder, Serializable):
 
   def calc_loss(self, tree_dec_state, ref_action, trg_rule_vocab):
     ref_word = ref_action.get_col(0)
-    scores, valid_size = self.get_scores(tree_dec_state, trg_rule_vocab, ref_action.get_col(5)[0])
+    scores, valid_y_len = self.get_scores(tree_dec_state, trg_rule_vocab, ref_action.get_col(5)[0])
     # single mode
     if not xnmt.batcher.is_batched(ref_action):
       return dy.pickneglogsoftmax(scores, ref_word)

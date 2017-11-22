@@ -1,5 +1,5 @@
 from __future__ import division, generators
-
+import numpy as np
 import sys
 import math
 import time
@@ -165,6 +165,21 @@ class BatchLossTracker(LossTracker):
 
   def count_trg_words(self, trg_words):
     return sum((1 if type(x) == int else len(x)) for x in trg_words)
+
+  def count_sent_num(self, obj):
+    return len(obj)
+
+class BatchTreeLossTracker(LossTracker):
+  """
+  A class to track training process and generate report for minibatch mode.
+  """
+
+  def count_trg_words(self, trg_words):
+    ''' x is TreeInput; t is [tree node data]; mask is 1 if masked  '''
+    if trg_words.mask:
+      return sum(sum(t[3] for t in x)  for x in trg_words) - np.sum(trg_words.mask)
+    else:
+      return sum(sum(t[3] for t in x)  for x in trg_words) 
 
   def count_sent_num(self, obj):
     return len(obj)

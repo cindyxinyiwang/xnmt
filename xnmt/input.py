@@ -666,6 +666,10 @@ def split_sent_piece(root, piece_l, word_idx):
   Split words into sentence piece
   '''
   new_children = []
+  if word_idx >= len(piece_l):
+    print(str(root))
+    print(str(piece_l))
+    print(word_idx)
   for i, c in enumerate(root.children):
     if type(c) == str or type(c) == unicode:
       # find number of empty space in c

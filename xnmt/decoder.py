@@ -174,10 +174,10 @@ class TreeDecoder(RnnDecoder, Serializable):
   def __init__(self, yaml_context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, word_lstm=False):
+               bridge=None, word_lstm=False, start_nonterm='ROOT'):
     register_handler(self)
     param_col = yaml_context.dynet_param_collection.param_col
-
+    self.start_nonterm = start_nonterm
     # Define dim
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
@@ -262,12 +262,11 @@ class TreeDecoder(RnnDecoder, Serializable):
     if decoding:
       zeros_lstm = dy.zeros(self.lstm_dim)
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
-          open_nonterms=[OpenNonterm('ROOT', parent_state=zeros_lstm, sib_state=zeros_lstm)], \
+          open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
           prev_word_state=zeros_lstm)
     else:     
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
-        open_nonterms=[OpenNonterm('ROOT')], \
           states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
@@ -382,7 +381,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     #else:
     h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:
-      return self.vocab_projector(h_t), 0
+      #return self.vocab_projector(h_t), 0
       label = trg_rule_vocab.tag_vocab[label_idx]
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:

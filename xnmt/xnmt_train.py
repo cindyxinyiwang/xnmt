@@ -124,7 +124,7 @@ class XnmtTrainer(object):
     if args.src_format == "contvec":
       self.batcher.pad_token = np.zeros(self.model.src_embedder.emb_dim)
     self.pack_batches()
-    if type(self.model.decoder) == "TreeDocoder":
+    if isinstance(self.model.decoder, TreeDecoder):
       self.logger = BatchTreeLossTracker(args.dev_every, self.total_train_sent)
     else:
       self.logger = BatchLossTracker(args.dev_every, self.total_train_sent)

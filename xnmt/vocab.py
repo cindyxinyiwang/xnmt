@@ -79,7 +79,7 @@ class Vocab(Serializable):
       self.i2w.append(w)
     self.unk_token = self.w2i[w]
 
-class RuleVocab(Vocab):
+class RuleVocab(Serializable):
   '''
   Converts between strings and integer ids
   '''
@@ -100,11 +100,21 @@ class RuleVocab(Vocab):
     i2w and vocab_file are mutually exclusive
     """
     assert i2w is None or vocab_file is None
+    self.tag_vocab = Vocab()
+    self.lhs_to_index = defaultdict(list)
+
     if vocab_file:
       i2w = Vocab.i2w_from_vocab_file(vocab_file)
     if (i2w is not None):
       self.i2w = i2w
-      self.w2i = {word: word_id for (word_id, word) in enumerate(self.i2w)}
+      self.w2i = {}
+      for (word_id, word) in enumerate(self.i2w):
+        self.w2i[word] = word_id
+        if hasattr(word, 'lhs'):
+          self.lhs_to_index[word.lhs].append(word_id)
+          self.tag_vocab.convert(word.lhs)
+          for r in word.open_nonterms:
+            self.tag_vocab.convert(r)
     else :
       self.w2i = {}
       self.i2w = []
@@ -113,11 +123,10 @@ class RuleVocab(Vocab):
       self.w2i[self.ES_STR] = self.ES
       self.i2w.append(self.SS_STR)
       self.i2w.append(self.ES_STR)
-    self.frozen = False
-    self.serialize_params = {"i2w" : self.i2w}
-    self.lhs_to_index = defaultdict(list)
 
-    self.tag_vocab = Vocab()
+    self.frozen = False
+
+    self.serialize_params = {"i2w": self.i2w}
 
   def freeze(self):
     self.frozen = True
@@ -132,30 +141,48 @@ class RuleVocab(Vocab):
       self.lhs_to_index[w.lhs].append(len(self.i2w))
       self.i2w.append(w)
 
-    self.tag_vocab.convert(w.lhs)
-    for r in w.open_nonterms:
-      self.tag_vocab.convert(r)
+    if not self.frozen:
+      self.tag_vocab.convert(w.lhs)
+      for r in w.open_nonterms:
+        self.tag_vocab.convert(r)
 
     return self.w2i[w] 
 
   def rule_index_with_lhs(self, lhs):
     return self.lhs_to_index[lhs]
 
+  def __getitem__(self, i):
+    return self.i2w[i]
 
-class Rule(object):
+  def __len__(self):
+    return len(self.i2w)
 
+  def set_unk(self, w):
+    assert self.frozen, 'Attempt to call set_unk on a non-frozen dict'
+    if w not in self.w2i:
+      self.w2i[w] = len(self.i2w)
+      self.i2w.append(w)
+    self.unk_token = self.w2i[w]
+
+
+class Rule(Serializable):
   yaml_tag = "!Rule"
+
   def __init__(self, lhs, rhs=[], open_nonterms=[]):
     self.lhs = lhs
     self.rhs = rhs 
     self.open_nonterms = open_nonterms
+    self.serialize_params = {'lhs': self.lhs, 'rhs': self.rhs, 'open_nonterms': self.open_nonterms}
 
   def __str__(self):
     return (self.lhs + u'|||' + u' '.join(self.rhs) + u'|||' + u' '.join(self.open_nonterms)).encode('utf-8')
 
   def __hash__(self):
     #return hash(str(self) + " ".join(open_nonterms))
-    return hash(str(self))
+    if not hasattr(self, 'lhs'):
+      return id(self)
+    else:
+      return hash(str(self))
 
   def __eq__(self, other):
     if not hasattr(other, 'lhs'):

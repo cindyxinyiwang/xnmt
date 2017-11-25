@@ -121,6 +121,7 @@ class XnmtTrainer(object):
       self.batcher = SrcBatcher(32)
     else:
       self.batcher = self.model_serializer.initialize_object(self.args.batcher) if self.need_deserialization else self.args.batcher
+    self.dev_batcher = SrcBatcher(1)
     if args.src_format == "contvec":
       self.batcher.pad_token = np.zeros(self.model.src_embedder.emb_dim)
     self.pack_batches()
@@ -133,7 +134,7 @@ class XnmtTrainer(object):
     self.train_src, self.train_trg = \
       self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
     self.dev_src, self.dev_trg = \
-      self.batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
+      self.dev_batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
     pass
 
   def dynet_trainer_for_args(self, args, model_context):

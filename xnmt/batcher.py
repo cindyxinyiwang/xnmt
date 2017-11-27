@@ -20,7 +20,7 @@ class Batch(list):
     if batched:
       return mark_as_batch(np.reshape(self, (len(self), len(self[0])))[:, col], mask=self.mask)
     else:
-      np.reshape(self, (len(self), len(self[0])))[:, col]
+      return np.reshape(self, (len(self), len(self[0])))[:, col]
   
 class Mask(object):
   """

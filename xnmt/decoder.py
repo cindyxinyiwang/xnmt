@@ -172,9 +172,9 @@ class TreeDecoder(RnnDecoder, Serializable):
 
 
   def __init__(self, yaml_context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
-               mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
+               mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, word_lstm=False, start_nonterm='ROOT'):
+               bridge=None, word_lstm=False, start_nonterm='ROOT', frontir_feeding=False):
     register_handler(self)
     param_col = yaml_context.dynet_param_collection.param_col
     self.start_nonterm = start_nonterm
@@ -182,6 +182,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
     trg_embed_dim  = trg_embed_dim or yaml_context.default_layer_dim
+    tag_embed_dim = tag_embed_dim or yaml_context.default_layer_dim
     input_dim      = input_dim or yaml_context.default_layer_dim
     self.input_dim = input_dim
     # Input feeding
@@ -192,8 +193,11 @@ class TreeDecoder(RnnDecoder, Serializable):
     if input_feeding:
       lstm_input += input_dim
     plain_lstm_input = lstm_input
-    # parent state + last_word_state + sibling state
+    # parent state + last_word_state + frontir embedding
     lstm_input += lstm_dim * 2
+    self.frontir_feeding = frontir_feeding
+    if frontir_feeding:
+      lstm_input += tag_embed_dim
     if word_lstm:
       lstm_input += lstm_dim
 
@@ -269,7 +273,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
           states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
-  def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None):
+  def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None, tag_embedder=None):
     """Add an input and update the state.
 
     :param tree_dec_state: An TreeDecoderState object containing the current state.
@@ -305,6 +309,7 @@ class TreeDecoder(RnnDecoder, Serializable):
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
       is_terminal = trg.get_col(3, batched=False)
+
       #paren_tm1_list = []
       #last_word_list = []
       #for i in range(batch_size):
@@ -316,6 +321,11 @@ class TreeDecoder(RnnDecoder, Serializable):
       paren_tm1_state = paren_tm1_states[0]
       last_word_state = last_word_states[0]
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
+
+      if self.frontir_feeding:
+        frontir_list = trg.get_col(4, batched=False)
+        frontir_emb = tag_embedder.embed(frontir_list[0])
+        inp = dy.concatenate([inp, frontir_emb])
       # get word_rnn state
       word_rnn_state = tree_dec_state.word_rnn_state
       if self.set_word_lstm:
@@ -337,8 +347,19 @@ class TreeDecoder(RnnDecoder, Serializable):
         for c in cur_nonterm:
           print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
-      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+      #inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
       #inp = dy.concatenate([inp, cur_nonterm.parent_state, cur_nonterm.sib_state])
+      # find frontier node label
+      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+      if self.frontir_feeding:
+        if rule.open_nonterms:
+          frontir_emb = trg_rule_vocab.tag_vocab.convert(rule.open_nonterms[0])
+        elif tree_dec_state.open_nonterms:
+          frontir_emb = trg_rule_vocab.tag_vocab.convert(tree_dec_state.open_nonterms[-1].label)
+        else:
+          frontir_emb = trg_rule_vocab.tag_vocab.ES
+        frontir_emb = tag_embedder.embed(frontir_emb)
+        inp = dy.concatenate([inp, frontir_emb])
 
       word_rnn_state = tree_dec_state.word_rnn_state
       if self.set_word_lstm:
@@ -348,7 +369,7 @@ class TreeDecoder(RnnDecoder, Serializable):
             word_inp = dy.concatenate([word_inp, tree_dec_state.context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
         inp = dy.concatenate([inp, word_rnn_state.output()])
- 
+
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       # add current state to its sibling
       #if cur_nonterm.is_sibling:

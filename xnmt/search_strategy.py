@@ -56,7 +56,7 @@ class BeamSearch(SearchStrategy):
     def __repr__(self):
       return "hypo S=%s |ids|=%s" % (self.score, len(self.id_list))
 
-  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None, trg_rule_vocab=None):
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None, trg_rule_vocab=None, tag_embedder=None):
     """
     :param decoder: decoder.Decoder subclass
     :param attender: attender.Attender subclass
@@ -82,7 +82,8 @@ class BeamSearch(SearchStrategy):
         dec_state = hyp.state
         if length > 0: # don't feed in the initial start-of-sentence token
           if trg_rule_vocab:
-            dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]), hyp.id_list[-1], trg_rule_vocab)
+            dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]),
+                                          hyp.id_list[-1], trg_rule_vocab, tag_embedder)
             if len(dec_state.open_nonterms) == 0:
               # only know if the stack is empty after we add the current rule back to the tree
               completed_hyp.append(hyp)

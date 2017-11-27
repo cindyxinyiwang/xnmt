@@ -60,7 +60,8 @@ class TrainingMLELoss(Serializable):
       if i < seq_len-1:
         if trg_is_list:
           word = ref_word.get_col(0) if type(ref_word[0]) == list else ref_word
-          dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word), ref_word, trg_rule_vocab)
+          dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word),
+                                                   ref_word, trg_rule_vocab=trg_rule_vocab, tag_embedder=translator.tag_embedder)
         else:
           dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(ref_word))      
     return dy.esum(losses)

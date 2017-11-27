@@ -56,7 +56,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
 
   yaml_tag = u'!DefaultTranslator'
 
-  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder, loop_trg=False):
+  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder, loop_trg=False, tag_embedder=None):
     '''Constructor.
 
     :param src_embedder: A word embedder for the input language
@@ -72,6 +72,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     self.trg_embedder = trg_embedder
     self.decoder = decoder
     self.loop_trg = loop_trg
+    self.tag_embedder = tag_embedder
 
   def shared_params(self):
     return [set(["src_embedder.emb_dim", "encoder.input_dim"]),
@@ -80,11 +81,18 @@ class DefaultTranslator(Translator, Serializable, Reportable):
             set(["trg_embedder.emb_dim", "decoder.trg_embed_dim"])]
 
   def dependent_init_params(self):
-    return [DependentInitParam(param_descr="src_embedder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.src_reader.vocab_size()),
+    ret = [DependentInitParam(param_descr="src_embedder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.src_reader.vocab_size()),
             DependentInitParam(param_descr="decoder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab_size()),
             DependentInitParam(param_descr="trg_embedder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab_size()),
             DependentInitParam(param_descr="src_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.src_reader.vocab),
             DependentInitParam(param_descr="trg_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab)]
+    if hasattr(self.yaml_context, 'tag_embedder'):
+      ret += [DependentInitParam(param_descr="tag_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab.tag_vocab),
+              DependentInitParam(param_descr="tag_embedder.vocab_size",
+                                 value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.tag_vocab_size())]
+
+    return ret
+
 
   def initialize_generator(self, **kwargs):
     if kwargs.get("len_norm_type", None) is None:
@@ -163,7 +171,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
       else:
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
-      output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents), forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab)
+      output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents),
+                                                                   forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab, tag_embedder=self.tag_embedder)
       # In case of reporting
       if self.report_path is not None:
         src_words = [self.reporting_src_vocab[w] for w in sents]

@@ -1,15 +1,19 @@
 standard:
   experiment:
-    model_file: examples/output/<EXP>.mod
-    hyp_file: examples/output/<EXP>.hyp
-    out_file: examples/output/<EXP>.out
-    err_file: examples/output/<EXP>.err
-    cfg_file: examples/output/<EXP>.yaml
+    model_file: model/<EXP>.mod
+    #hyp_file: model/<EXP>.hyp
+    out_file: model/<EXP>.out
+    err_file: model/<EXP>.err
+    cfg_file: model/<EXP>.yaml
     run_for_epochs: 20
-    eval_metrics: bleu
+    score_nbest: True
+    #eval_metrics: bleu
+    eval_only: True
   train: !TrainingRegimen
-    batcher: !WordSrcBatcher
-      avg_batch_size: 10
+    pretrained_model_file: model/standard.mod
+    dev_every: 2
+    batcher: !SrcBatcher
+      batch_size: 1
     glob:
       dropout: 0.1
       default_layer_dim: 512
@@ -22,10 +26,10 @@ standard:
       src_reader: !PlainTextReader {}
       trg_reader: !PlainTextReader {}
       training_corpus: !BilingualTrainingCorpus
-        train_src: examples/data/train.ja
-        train_trg: examples/data/train.en
-        dev_src: examples/data/dev.ja
-        dev_trg: examples/data/dev.en
+        train_src: examples/data/head.ja
+        train_trg: examples/data/head.en
+        dev_src: examples/data/head.ja
+        dev_trg: examples/data/head.en
     model: !DefaultTranslator
       src_embedder: !SimpleWordEmbedder {}
       encoder: !BiLSTMSeqTransducer
@@ -41,6 +45,9 @@ standard:
     beam: 5
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
-    src_file: examples/data/test.ja
-  evaluate:
-    ref_file: examples/data/test.en
+    src_file: examples/data/head.ja
+    nbest_file: examples/data/head.en.nbest
+    mode: score_nbest
+    nbest: 2
+  #evaluate:
+  #  ref_file: examples/data/head.en

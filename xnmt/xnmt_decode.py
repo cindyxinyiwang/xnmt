@@ -21,9 +21,9 @@ NO_DECODING_ATTEMPTED = u"@@NO_DECODING_ATTEMPTED@@"
 
 class XnmtDecoder(Serializable):
   yaml_tag = u'!XnmtDecoder'
-  def __init__(self, model_file=None, src_file=None, trg_file=None, ref_file=None, max_src_len=None,
+  def __init__(self, model_file=None, src_file=None, trg_file=None, ref_file=None, nbest_file=None, max_src_len=None,
                   input_format="text", post_process="none", report_path=None, report_type="html",
-                  beam=1, max_len=100, len_norm_type=None, mode="onebest"):
+                  beam=1, max_len=100, nbest=-1, len_norm_type=None, mode="onebest"):
     """
     :param model_file: pretrained (saved) model path (required onless model_elements is given)
     :param src_file: path of input src file to be translated
@@ -52,6 +52,10 @@ class XnmtDecoder(Serializable):
     self.max_len = max_len
     self.len_norm_type = len_norm_type
     self.mode = mode
+
+    self.nbest = nbest
+    self.nbest_file = nbest_file
+
     
 
   def __call__(self, src_file=None, trg_file=None, candidate_id_file=None, model_elements=None):
@@ -80,11 +84,10 @@ class XnmtDecoder(Serializable):
     
     args = dict(model_file=self.model_file, src_file=src_file or self.src_file, trg_file=trg_file or self.trg_file, ref_file=self.ref_file, max_src_len=self.max_src_len,
                   input_format=self.input_format, post_process=self.post_process, candidate_id_file=candidate_id_file, report_path=self.report_path, report_type=self.report_type,
-                  beam=self.beam, max_len=self.max_len, len_norm_type=self.len_norm_type, mode=self.mode)
+                  beam=self.beam, max_len=self.max_len, len_norm_type=self.len_norm_type, mode=self.mode, nbest_file=self.nbest_file, nbest=self.nbest)
   
     is_reporting = issubclass(generator.__class__, Reportable) and args["report_path"] is not None
-    # Corpus
-    src_corpus = list(corpus_parser.src_reader.read_sents(args["src_file"]))
+
     # Get reference if it exists and is necessary
     if args["mode"] == "forced" or args["mode"] == "forceddebug":
       if args["ref_file"] == None:
@@ -92,6 +95,20 @@ class XnmtDecoder(Serializable):
       ref_corpus = list(corpus_parser.trg_reader.read_sents(args["ref_file"]))
     else:
       ref_corpus = None
+
+    if args["mode"] == 'score_nbest':
+      assert args["nbest_file"] != None
+      assert args["nbest"] > 0
+      # read in nbest corpus
+      src_corpus = list(corpus_parser.src_reader.read_sents(args["src_file"]))
+      if args["nbest"] > 1:
+        src_corpus = [l for l in src_corpus for i in range(args["nbest"])]
+      ref_corpus = list(corpus_parser.trg_reader.read_sents(args["nbest_file"]))
+      assert len(src_corpus) == len(ref_corpus)
+    else:
+      # Corpus
+      src_corpus = list(corpus_parser.src_reader.read_sents(args["src_file"]))
+
     # Vocab
     src_vocab = corpus_parser.src_reader.vocab if hasattr(corpus_parser.src_reader, "vocab") else None
     trg_vocab = corpus_parser.trg_reader.vocab if hasattr(corpus_parser.trg_reader, "vocab") else None
@@ -111,7 +128,7 @@ class XnmtDecoder(Serializable):
   
     # If we're debugging, calculate the loss for each target sentence
     ref_scores = None
-    if args["mode"] == 'forceddebug':
+    if args["mode"] == 'forceddebug' or args["mode"] == 'score_nbest':
       batcher = xnmt.batcher.InOrderBatcher(32) # Arbitrary
       batched_src, batched_ref = batcher.pack(src_corpus, ref_corpus)
       ref_scores = []
@@ -120,23 +137,28 @@ class XnmtDecoder(Serializable):
         loss_expr = generator.calc_loss(src, ref)
         ref_scores.extend(loss_expr.value())
       ref_scores = [-x for x in ref_scores]
-  
+      if args["mode"] == 'score_nbest':
+        with io.open(args['nbest_file'] + ".score", 'wt', encoding='utf-8') as fp:
+          for s in ref_scores:
+            fp.write(u"{}\n".format(str(s)))
+
     # Perform generation of output
-    with io.open(args["trg_file"], 'wt', encoding='utf-8') as fp:  # Saving the translated output to a trg file
-      for i, src in enumerate(src_corpus):
-        # Do the decoding
-        if args["max_src_len"] is not None and len(src) > args["max_src_len"]:
-          output_txt = NO_DECODING_ATTEMPTED
-        else:
-          dy.renew_cg()
-          ref_ids = ref_corpus[i] if ref_corpus != None else None
-          output = generator.generate_output(src, i, forced_trg_ids=ref_ids)
-          # If debugging forced decoding, make sure it matches
-          if ref_scores != None and (abs(output[0].score-ref_scores[i]) / abs(ref_scores[i])) > 1e-5:
-            print('Forced decoding score {} and loss {} do not match at sentence {}'.format(output[0].score, ref_scores[i], i))
-          output_txt = output[0].plaintext
-        # Printing to trg file
-        fp.write(u"{}\n".format(output_txt))
+    if args["mode"] != "score_nbest":
+      with io.open(args["trg_file"], 'wt', encoding='utf-8') as fp:  # Saving the translated output to a trg file
+        for i, src in enumerate(src_corpus):
+          # Do the decoding
+          if args["max_src_len"] is not None and len(src) > args["max_src_len"]:
+            output_txt = NO_DECODING_ATTEMPTED
+          else:
+            dy.renew_cg()
+            ref_ids = ref_corpus[i] if ref_corpus != None else None
+            output = generator.generate_output(src, i, forced_trg_ids=ref_ids)
+            # If debugging forced decoding, make sure it matches
+            if ref_scores != None and (abs(output[0].score-ref_scores[i]) / abs(ref_scores[i])) > 1e-5:
+              print('Forced decoding score {} and loss {} do not match at sentence {}'.format(output[0].score, ref_scores[i], i))
+            output_txt = output[0].plaintext
+          # Printing to trg file
+          fp.write(u"{}\n".format(output_txt))
   
   def get_output_processor(self):
     spec = self.post_process

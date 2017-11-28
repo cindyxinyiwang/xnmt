@@ -121,7 +121,7 @@ def main(overwrite_args=None):
     if not exp_args["eval_only"]:
       print('reverting learned weights to best checkpoint..')
       training_regimen.model_context.dynet_param_collection.revert_to_best_model()
-    if evaluators:
+    if evaluators and not exp_args["score_nbest"]:
       print("> Evaluating test set")
       output.indent += 2
       xnmt_decoder(model_elements=(training_regimen.corpus_parser, training_regimen.model))
@@ -135,6 +135,8 @@ def main(overwrite_args=None):
 
     results.append((experiment_name, eval_scores))
 
+    if exp_args["score_nbest"]:
+      xnmt_decoder(model_elements=(training_regimen.corpus_parser, training_regimen.model))
     output.close()
     err_output.close()
 

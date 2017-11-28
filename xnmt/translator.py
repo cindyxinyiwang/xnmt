@@ -86,7 +86,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
             DependentInitParam(param_descr="trg_embedder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab_size()),
             DependentInitParam(param_descr="src_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.src_reader.vocab),
             DependentInitParam(param_descr="trg_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab)]
-    if hasattr(self.yaml_context, 'tag_embedder'):
+    if hasattr(self, 'tag_embedder'):
       ret += [DependentInitParam(param_descr="tag_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab.tag_vocab),
               DependentInitParam(param_descr="tag_embedder.vocab_size",
                                  value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.tag_vocab_size())]

@@ -145,10 +145,11 @@ class OpenNonterm:
 
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
-  def __init__(self, rnn_state=None, word_rnn_state=None, context=None, states=[], tree=None, open_nonterms=[], prev_word_state=None):
+  def __init__(self, rnn_state=None, word_rnn_state=None, word_context=None, context=None, states=[], tree=None, open_nonterms=[], prev_word_state=None):
     self.rnn_state = rnn_state
     self.word_rnn_state = word_rnn_state
     self.context = context
+    self.word_context = word_context
     # training time
     self.states = states
     self.tree = tree
@@ -161,7 +162,7 @@ class TreeDecoderState:
     open_nonterms_copy = []
     for n in self.open_nonterms:
       open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state, n.is_sibling, n.sib_state))
-    return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context,
+    return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
                             open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state)
 
 class TreeDecoder(RnnDecoder, Serializable):
@@ -265,12 +266,12 @@ class TreeDecoder(RnnDecoder, Serializable):
     self.decoding = decoding
     if decoding:
       zeros_lstm = dy.zeros(self.lstm_dim)
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_context=zeros, word_rnn_state=word_rnn_state, \
           open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
           prev_word_state=zeros_lstm)
     else:     
       batch_size = ss_expr.dim()[1]
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_rnn_state=word_rnn_state, \
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros, word_context=zeros, word_rnn_state=word_rnn_state, \
           states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
   def add_input(self, tree_dec_state, trg_embedding, trg, trg_rule_vocab=None, tag_embedder=None):
@@ -289,22 +290,6 @@ class TreeDecoder(RnnDecoder, Serializable):
       # get parent states for this batch
       batch_size = trg_embedding.dim()[1]
       assert batch_size == 1
-      #cur_nonterm = tree_dec_state.open_nonterms.pop()
-      #rule = trg_rule_vocab[trg.get_col(0)[0]]
-      #if cur_nonterm.label != rule.lhs:
-      #  for c in cur_nonterm:
-      #    print c.label
-      #assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
-      #new_open_nonterms = []
-      #open_nonterms = tree_dec_state.open_nonterms[:]
-      #for rhs in rule.open_nonterms:
-      #  new_open_nonterms.append(OpenNonterm(rhs))
-      #new_open_nonterms.reverse()
-      #open_nonterms.extend(new_open_nonterms)
-
-      #print(rule)
-      #for n in open_nonterms:
-      #  print(n.label.encode('utf-8'))
 
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       last_word_states = tree_dec_state.states[trg.get_col(2)]
@@ -316,29 +301,30 @@ class TreeDecoder(RnnDecoder, Serializable):
       #  paren_tm1_list.append(dy.pick_batch_elem(paren_tm1_states[i], i))
       #  last_word_list.append(dy.pick_batch_elem(last_word_states[i], i))
       #paren_tm1_state = dy.concatenate_to_batch(paren_tm1_list)
-      #last_word_state = dy.concatenate_to_batch(last_word_list)
+      #last_word_state = dy.concatenate_to_batch(last_]word_list)
       
       paren_tm1_state = paren_tm1_states[0]
       last_word_state = last_word_states[0]
       inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
-
+      #r = trg_rule_vocab[trg.get_col(0)[0]]
+      #l = trg_rule_vocab.tag_vocab[trg.get_col(4)[0]]
       if self.frontir_feeding:
-        frontir_list = trg.get_col(4, batched=False)
+        frontir_list = trg.get_col(5, batched=False)
         frontir_emb = tag_embedder.embed(frontir_list[0])
         inp = dy.concatenate([inp, frontir_emb])
       # get word_rnn state
       word_rnn_state = tree_dec_state.word_rnn_state
       if self.set_word_lstm:
-        word_inp = trg_embedding
-        if self.input_feeding:
-          word_inp = dy.concatenate([word_inp, tree_dec_state.context])
         #word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp, inv_mask=is_terminal)
-        if np.count_nonzero(is_terminal) > 0:
+        if is_terminal[0] == 1:
+          word_inp = trg_embedding
+          if self.input_feeding:
+            word_inp = dy.concatenate([word_inp, tree_dec_state.word_context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
         inp = dy.concatenate([inp, word_rnn_state.output()])
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=np.append(tree_dec_state.states, rnn_state.output()))
     else:
       cur_nonterm = tree_dec_state.open_nonterms.pop()
@@ -351,14 +337,9 @@ class TreeDecoder(RnnDecoder, Serializable):
       #inp = dy.concatenate([inp, cur_nonterm.parent_state, cur_nonterm.sib_state])
       # find frontier node label
       inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+
       if self.frontir_feeding:
-        if rule.open_nonterms:
-          frontir_emb = trg_rule_vocab.tag_vocab.convert(rule.open_nonterms[0])
-        elif tree_dec_state.open_nonterms:
-          frontir_emb = trg_rule_vocab.tag_vocab.convert(tree_dec_state.open_nonterms[-1].label)
-        else:
-          frontir_emb = trg_rule_vocab.tag_vocab.ES
-        frontir_emb = tag_embedder.embed(frontir_emb)
+        frontir_emb = tag_embedder.embed(trg_rule_vocab.tag_vocab.convert(rule.lhs))
         inp = dy.concatenate([inp, frontir_emb])
 
       word_rnn_state = tree_dec_state.word_rnn_state
@@ -366,7 +347,7 @@ class TreeDecoder(RnnDecoder, Serializable):
         if len(rule.open_nonterms) == 0:
           word_inp = trg_embedding
           if self.input_feeding:
-            word_inp = dy.concatenate([word_inp, tree_dec_state.context])
+            word_inp = dy.concatenate([word_inp, tree_dec_state.word_context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
         inp = dy.concatenate([inp, word_rnn_state.output()])
 
@@ -388,7 +369,7 @@ class TreeDecoder(RnnDecoder, Serializable):
           prev_word_state = rnn_state.output()
       new_open_nonterms.reverse()
       open_nonterms.extend(new_open_nonterms)
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, \
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state)
 
   def get_scores(self, tree_dec_state, trg_rule_vocab, label_idx=-1):
@@ -402,7 +383,7 @@ class TreeDecoder(RnnDecoder, Serializable):
     #else:
     h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:
-      #return self.vocab_projector(h_t), 0
+      return self.vocab_projector(h_t), 0
       label = trg_rule_vocab.tag_vocab[label_idx]
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:

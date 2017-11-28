@@ -51,6 +51,8 @@ class TrainingMLELoss(Serializable):
                       else xnmt.batcher.mark_as_batch([single_trg[i] for single_trg in trg])
       dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output(), pick_src_elem)
       if trg_is_list:
+          if translator.decoder.set_word_lstm:
+            dec_state.word_context = translator.attender.calc_context(dec_state.word_rnn_state.output(), pick_src_elem)
           word_loss = translator.decoder.calc_loss(dec_state, ref_word, trg_rule_vocab)
       else:
           word_loss = translator.decoder.calc_loss(dec_state, ref_word)

@@ -840,7 +840,7 @@ if __name__ == "__main__":
     data = tree.get_data_root(r)
     for d in data:
         print d
-        print r[d[0]], "frontir: ", r.tag_vocab[d[4]]
+        print r[d[0]], "frontir: ", r.tag_vocab[d[5]]
     for i, n in tree.id2n.items():
         print i, str(n), n.last_word_t, n.sib_t
 

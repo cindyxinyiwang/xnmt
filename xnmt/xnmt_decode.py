@@ -137,7 +137,8 @@ class XnmtDecoder(Serializable):
         dy.renew_cg()
         loss_expr = generator.calc_loss(src, ref)
         ref_scores.extend(loss_expr.value())
-        ref_unk_counts.append(sum([1 if i == trg_vocab.unk_token else 0 for i in ref]))
+        #ref_unk_counts.append(sum([1 if i == trg_vocab.unk_token else 0 for i in ref]))
+        ref_unk_counts.extend(ref.num_unk(trg_vocab))
       ref_scores = [-x for x in ref_scores]
       if args["mode"] == 'score_nbest':
         with io.open(args['nbest_file'] + ".score", 'wt', encoding='utf-8') as fp:

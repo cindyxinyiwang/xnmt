@@ -16,6 +16,12 @@ class Batch(list):
     super(Batch, self).__init__(batch_list)
     self.mask = mask
 
+  def num_unk(self, vocab):
+    count = [];
+    for item in self:
+      count.append(sum([1 if i == vocab.unk_token else 0 for i in item]))
+    return count
+
 class Mask(object):
   """
   Masks are represented as numpy array of dimensions batchsize x seq_len, with parts

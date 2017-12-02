@@ -132,15 +132,17 @@ class XnmtDecoder(Serializable):
       batcher = xnmt.batcher.InOrderBatcher(32) # Arbitrary
       batched_src, batched_ref = batcher.pack(src_corpus, ref_corpus)
       ref_scores = []
+      ref_unk_counts = []
       for src, ref in zip(batched_src, batched_ref):
         dy.renew_cg()
         loss_expr = generator.calc_loss(src, ref)
         ref_scores.extend(loss_expr.value())
+        ref_unk_counts.append(sum([1 if i == trg_vocab.unk_token else 0 for i in ref]))
       ref_scores = [-x for x in ref_scores]
       if args["mode"] == 'score_nbest':
         with io.open(args['nbest_file'] + ".score", 'wt', encoding='utf-8') as fp:
-          for s in ref_scores:
-            fp.write(u"{}\n".format(str(s)))
+          for s, c in zip(ref_scores, ref_unk_counts):
+            fp.write(u"{} {}\n".format(str(s), c))
 
     # Perform generation of output
     if args["mode"] != "score_nbest":

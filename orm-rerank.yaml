@@ -1,0 +1,52 @@
+orm-rerank:
+  experiment:
+    model_file: orm-eng/output/<EXP>.mod
+    hyp_file: orm-eng/output/<EXP>.hyp
+    out_file: orm-eng/output/<EXP>.out
+    err_file: orm-eng/output/<EXP>.err
+    cfg_file: orm-eng/output/<EXP>.yaml
+    run_for_epochs: 50
+    eval_metrics: bleu
+    eval_only: True
+  train: !TrainingRegimen
+    glob: 
+      dropout: 0.2
+      default_layer_dim: 512
+    restart_trainer: True
+    trainer: !AdamTrainer
+      learning_rate: 0.001
+    attempts_before_lr_decay: 5
+    lr_decay: 0.5
+    dev_metrics: bleu
+    schedule_metric: bleu
+    batcher: !WordSrcBatcher
+      avg_batch_size: 64
+    corpus_parser: !BilingualCorpusParser
+      src_reader: !PlainTextReader {}
+      trg_reader: !PlainTextReader {}
+      training_corpus: !BilingualTrainingCorpus
+        train_src: orm-eng/data/set0-train+lexicon+abo+leidos.lexclean.spm16000.orm
+        train_trg: orm-eng/data/set0-train+lexicon+abo+leidos.lexclean.spm16000.eng
+        dev_src: orm-eng/data/ling_trans.spm16000.orm
+        dev_trg: orm-eng/data/ling_trans.spm16000.eng
+    model: !DefaultTranslator
+      src_embedder: !DenseWordEmbedder &src_emb
+        _xnmt_id: src_emb
+      encoder: !BiLSTMSeqTransducer
+        layers: 1
+      attender: !DotAttender {}
+      trg_embedder: *src_emb
+      decoder: !MlpSoftmaxDecoder
+        layers: 1
+        bridge: !CopyBridge {}
+        vocab_projector: *src_emb
+  decode: !XnmtDecoder
+    beam: 5
+    len_norm_type: !PolynomialNormalization
+      apply_during_search: true
+    # post_process: join-char
+    src_file: orm-eng/data/nbest_src.piece
+    nbest_file: orm-eng/data/nbest_sents.piece
+    mode: score_nbest
+    nbest: 1
+

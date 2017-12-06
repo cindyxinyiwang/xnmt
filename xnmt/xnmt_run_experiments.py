@@ -75,6 +75,7 @@ def main(overwrite_args=None):
     if not "cfg_file" in exp_args: exp_args["cfg_file"] = None
     if not "eval_only" in exp_args: exp_args["eval_only"] = False
     if not "eval_metrics" in exp_args: exp_args["eval_metrics"] = "bleu"
+    if not "score_nbest" in exp_args: exp_args["score_nbest"] = False
     if "cfg_file" in exp_args and exp_args["cfg_file"] != None:
       shutil.copyfile(args.experiments_file, exp_args["cfg_file"])
 

@@ -21,7 +21,7 @@ NO_DECODING_ATTEMPTED = u"@@NO_DECODING_ATTEMPTED@@"
 
 class XnmtDecoder(Serializable):
   yaml_tag = u'!XnmtDecoder'
-  def __init__(self, model_file=None, src_file=None, trg_file=None, ref_file=None, nbest_file=None, max_src_len=None,
+  def __init__(self, model_file=None, src_file=None, trg_file=None, ref_file=None, nbest_file=None, new_feat_file=None, max_src_len=None,
                   input_format="text", post_process="none", report_path=None, report_type="html",
                   beam=1, max_len=100, nbest=-1, len_norm_type=None, mode="onebest"):
     """
@@ -29,6 +29,8 @@ class XnmtDecoder(Serializable):
     :param src_file: path of input src file to be translated
     :param trg_file: path of file where trg translatons will be written
     :param ref_file: path of file with reference translations, e.g. for forced decoding
+    :param nbest_file: path of nbest list to score
+    :param new_feat_file: path of file where neural rerank features will be written
     :param max_src_len (int): Remove sentences from data to decode that are longer than this on the source side
     :param input_format: format of input data: text/contvec
     :param post_process: post-processing of translation outputs: none/join-char/join-bpe/join-piece
@@ -55,7 +57,7 @@ class XnmtDecoder(Serializable):
 
     self.nbest = nbest
     self.nbest_file = nbest_file
-
+    self.new_feat_file = new_feat_file
     
 
   def __call__(self, src_file=None, trg_file=None, candidate_id_file=None, model_elements=None):
@@ -84,7 +86,7 @@ class XnmtDecoder(Serializable):
     
     args = dict(model_file=self.model_file, src_file=src_file or self.src_file, trg_file=trg_file or self.trg_file, ref_file=self.ref_file, max_src_len=self.max_src_len,
                   input_format=self.input_format, post_process=self.post_process, candidate_id_file=candidate_id_file, report_path=self.report_path, report_type=self.report_type,
-                  beam=self.beam, max_len=self.max_len, len_norm_type=self.len_norm_type, mode=self.mode, nbest_file=self.nbest_file, nbest=self.nbest)
+                  beam=self.beam, max_len=self.max_len, len_norm_type=self.len_norm_type, mode=self.mode, nbest_file=self.nbest_file, nbest=self.nbest, new_feat_file=self.new_feat_file)
   
     is_reporting = issubclass(generator.__class__, Reportable) and args["report_path"] is not None
 
@@ -141,9 +143,9 @@ class XnmtDecoder(Serializable):
         ref_unk_counts.extend(ref.num_unk(trg_vocab))
       ref_scores = [-x for x in ref_scores]
       if args["mode"] == 'score_nbest':
-        with io.open(args['nbest_file'] + ".score", 'wt', encoding='utf-8') as fp:
+        with io.open(args['new_feat_file'], 'wt', encoding='utf-8') as fp:
           for s, c in zip(ref_scores, ref_unk_counts):
-            fp.write(u"{} {}\n".format(str(s), c))
+            fp.write(u"neuralScore={} neuralOOV={}\n".format(str(s), c))
 
     # Perform generation of output
     if args["mode"] != "score_nbest":

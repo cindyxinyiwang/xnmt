@@ -5,6 +5,8 @@ import math
 import time
 import xnmt.loss
 
+from xnmt.vocab import Vocab
+
 class LossTracker(object):
   """
   A template class to track training process and generate report.
@@ -164,10 +166,17 @@ class BatchLossTracker(LossTracker):
   """
 
   def count_trg_words(self, trg_words):
-    if trg_words.mask:
-      return sum((1 if type(x) == int else len(x)) for x in trg_words) - np.sum(trg_words.mask.np_arr)
-    else:
-      return sum((1 if type(x) == int else len(x)) for x in trg_words)
+    #if trg_words.mask:
+    #  return sum((1 if type(x) == int else len(x)) for x in trg_words) - np.sum(trg_words.mask.np_arr)
+    #else:
+    #  return sum((1 if type(x) == int else len(x)) for x in trg_words)
+    trg_cnt = 0
+    for x in trg_words:
+      if type(x) == int:
+        trg_cnt += 1 if x != Vocab.ES else 0
+      else:
+        trg_cnt += sum([1 if y != Vocab.ES else 0 for y in x])
+    return trg_cnt
 
   def count_sent_num(self, obj):
     return len(obj)

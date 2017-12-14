@@ -1,11 +1,11 @@
 defaults:
   experiment:
-    model_file: examples/output/<EXP>.mod
-    hyp_file: examples/output/<EXP>.hyp
-    out_file: examples/output/<EXP>.out
-    err_file: examples/output/<EXP>.err
-    cfg_file: examples/output/<EXP>.yaml
-    run_for_epochs: 50
+    model_file: oromo/output/<EXP>.mod
+    hyp_file: oromo/output/<EXP>.hyp
+    out_file: oromo/output/<EXP>.out
+    err_file: orormo/output/<EXP>.err
+    cfg_file: oromo/output/<EXP>.yaml
+    run_for_epochs: 40
     eval_metrics: bleu
   train:
     dropout: 0.2
@@ -18,7 +18,7 @@ defaults:
     dev_metrics: bleu
     schedule_metric: bleu
     batcher: !SrcBatcher
-      batch_size: 4
+      batch_size: 8
     training_corpus: !BilingualTrainingCorpus
       train_src: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.orm
       train_trg: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.parse.eng,/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-train.nltk.piece.eng
@@ -36,18 +36,19 @@ defaults:
       attender: !StandardAttender {}
       trg_embedder: !SimpleWordEmbedder {}
       decoder: !TreeDecoder
-        word_lstm: True
+        word_lstm: False
         layers: 1
         mlp_hidden_dim: 512
         bridge: !CopyBridge {}
+        frontir_feeding: False
   decode:
     beam: 5
-    post_process: rule
+    post_process: rule-piece
     max_len: 300
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
     src_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.nltk.piece.orm
   evaluate:
-    ref_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.clean.eng
+    ref_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.nltk.eng
 
-oromo-tree-mask:
+oromo-tree:

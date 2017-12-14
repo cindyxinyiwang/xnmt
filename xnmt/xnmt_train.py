@@ -353,6 +353,8 @@ class XnmtTrainer(object):
       loss_builder.add_loss("loss", standard_loss)
       trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
       loss_builder.compute()
+      #print(self.logger.count_trg_words(self.dev_trg[i]))
+    #print("total %d" % trg_words_cnt)
     return trg_words_cnt, LossScore(loss_builder.sum() / trg_words_cnt)
 
 if __name__ == "__main__":

@@ -1,32 +1,37 @@
 defaults:
   experiment:
-    model_file: examples/output/<EXP>.mod
-    hyp_file: examples/output/<EXP>.hyp
-    out_file: examples/output/<EXP>.out
-    err_file: examples/output/<EXP>.err
-    cfg_file: examples/output/<EXP>.yaml
-    run_for_epochs: 20
+    model_file: kftt/output/<EXP>.mod
+    hyp_file: kftt/output/<EXP>.hyp
+    out_file: kftt/output/<EXP>.out
+    err_file: kftt/output/<EXP>.err
+    cfg_file: kftt/output/<EXP>.yaml
+    run_for_epochs: 30
     eval_metrics: bleu
   train:
+    batcher: !SrcBatcher
+      batch_size: 32
+    dev_every: 50000
     dropout: 0.1
     default_layer_dim: 512
-    restart_trainer: True
+    restart_trainer: False
     trainer: Adam
-    learning_rate: 0.0002
-    lr_decay: 0.5
+    learning_rate: 0.001
+    lr_decay: 1.
+    attempts_before_lr_decay: 5
     dev_metrics: bleu
+    schedule_metric: bleu
     training_corpus: !BilingualTrainingCorpus
-      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.ja
-      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-train.uppiece.en
-      dev_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja
-      dev_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.en
-      dev_ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en
+      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.ja
+      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.en
+      dev_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.ja
+      dev_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.en
+      dev_ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lower.en
     corpus_parser: !BilingualCorpusParser
       src_reader: !PlainTextReader {}
       trg_reader: !PlainTextReader {}
     model: !DefaultTranslator
       src_embedder: !SimpleWordEmbedder {}
-      encoder: !LSTMEncoder
+      encoder: !LSTMSeqTransducer
         layers: 1
       attender: !StandardAttender {}
       trg_embedder: !SimpleWordEmbedder {}
@@ -37,10 +42,17 @@ defaults:
   decode:
     beam: 5
     post_process: join-piece
+    max_len: 100
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
-    src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.uppiece.ja
+    src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lowpiece.ja
   evaluate:
-    ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/small/kyoto-tune.upper.en
+    ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lower.en
 
-kftt-std-small:
+kftt-seq-full:
+
+#kftt-tree-test:
+#  experiment:
+#    eval_only: True
+#  train:
+#    pretrained_model_file: examples/output/kftt-tree-bigb-masktrain.mod

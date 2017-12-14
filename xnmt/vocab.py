@@ -93,7 +93,7 @@ class RuleVocab(Serializable):
   ES_STR = u"</s>"
   UNK_STR = u"<unk>"
 
-  def __init__(self, i2w=None, vocab_file=None):
+  def __init__(self, i2w=None, vocab_file=None, tag_vocab=None):
     """
     :param i2w: list of words, including <s> and </s>
     :param vocab_file: file containing one word per line, and not containing <s>, </s>, <unk>

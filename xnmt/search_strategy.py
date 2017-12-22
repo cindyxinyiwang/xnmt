@@ -96,8 +96,8 @@ class BeamSearch(SearchStrategy):
         dec_state.context = attender.calc_context(dec_state.rnn_state.output())
         
         if trg_rule_vocab:
-          #if decoder.set_word_lstm:
-          #  dec_state.word_context = attender.calc_context(dec_state.word_rnn_state.output())
+          if decoder.set_word_lstm:
+            dec_state.word_context = attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
           score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
           score = dy.log_softmax(score).npvalue()

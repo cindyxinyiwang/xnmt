@@ -56,7 +56,8 @@ class BeamSearch(SearchStrategy):
     def __repr__(self):
       return "hypo S=%s |ids|=%s" % (self.score, len(self.id_list))
 
-  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None, trg_rule_vocab=None, tag_embedder=None):
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None,
+                      forced_trg_ids=None, trg_rule_vocab=None, tag_embedder=None, word_attender=None):
     """
     :param decoder: decoder.Decoder subclass
     :param attender: attender.Attender subclass
@@ -97,7 +98,7 @@ class BeamSearch(SearchStrategy):
         
         if trg_rule_vocab:
           if decoder.set_word_lstm:
-            dec_state.word_context = attender.calc_context(dec_state.word_rnn_state.output())
+            dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
           score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
           score = dy.log_softmax(score).npvalue()

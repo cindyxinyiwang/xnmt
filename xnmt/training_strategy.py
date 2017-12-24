@@ -52,7 +52,7 @@ class TrainingMLELoss(Serializable):
       dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output(), pick_src_elem)
       if trg_is_list:
           if translator.decoder.set_word_lstm:
-            dec_state.word_context = translator.attender.calc_context(dec_state.word_rnn_state.output(), pick_src_elem)
+            dec_state.word_context = translator.word_attender.calc_context(dec_state.word_rnn_state.output(), pick_src_elem)
           word_loss = translator.decoder.calc_loss(dec_state, ref_word, trg_rule_vocab)
       else:
           word_loss = translator.decoder.calc_loss(dec_state, ref_word)

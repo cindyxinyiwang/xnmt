@@ -700,6 +700,31 @@ class Tree(object):
             data.append(d)
         return data
 
+    def get_bpe_rule(self, rule_vocab):
+        ''' Get the rules for doing bpe. Label left and right child '''
+        rule_idx = []
+        for t in xrange(1, len(self.t2n)):
+            node = self.t2n[t]
+            children, open_nonterms = [], []
+            child_idx = 1
+            attach_tag = len(children) > 1
+            for c in node.children:
+                if type(c) == str or type(c) == unicode:
+                    if attach_tag:
+                        children.append(u'{}_{}'.format(c, child_idx))
+                    else:
+                        children.append(c)
+                else:
+                    if attach_tag:
+                        children.append(u'{}_{}'.format(c.label, child_idx))
+                    else:
+                        children.append(c.label)
+                    open_nonterms.append(c.label)
+                child_idx += 1
+            r = rule_vocab.convert(Rule(node.label, children, open_nonterms))
+            rule_idx.append(r)
+        return rule_idx
+
     def query_open_node_label(self):
         return self.id2n[self.open_nonterm_ids[-1]].label
 

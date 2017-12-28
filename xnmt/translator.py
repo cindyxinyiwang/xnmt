@@ -122,7 +122,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     :returns: (possibly batched) loss expression
     """
     assert hasattr(self, "loss_calculator")
-
+    if hasattr(self.decoder, 'decoding'):
+      self.decoder.decoding = False
     # Initialize the hidden state from the encoder
     if self.loop_trg:
       loss = []
@@ -149,6 +150,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), emb_ss)
         #loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, pick_src_elem=i, trg_rule_vocab=trg_rule_vocab))
         loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, trg_rule_vocab=trg_rule_vocab))
+        #dy.print_text_graphviz()
+        #exit(0)
       return dy.esum(loss)
     else:
       self.start_sent()
@@ -162,6 +165,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       return self.loss_calculator(self, dec_state, src, trg, trg_rule_vocab=trg_rule_vocab)
 
   def generate(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None):
+    if hasattr(self.decoder, 'decoding'):
+      self.decoder.decoding=True
     if not xnmt.batcher.is_batched(src):
       src = xnmt.batcher.mark_as_batch([src])
     else:

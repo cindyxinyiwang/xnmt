@@ -426,6 +426,9 @@ class TreeNode(object):
         self.last_word_t = last_word_t
         self.frontir_label = None
 
+    def is_preterminal(self):
+        return len(self.children) == 1 and (not hasattr(self.children[0], 'is_preterminal'))
+
     def to_parse_string(self):
         c_str = []
         stack = [self]
@@ -763,6 +766,8 @@ def split_sent_piece(root, piece_l, word_idx):
             # for p in piece_l[word_idx:word_idx+space_c+1]:
             # piece.extend(p.split())
             # word_idx += (space_c + 1)
+            print c
+            print piece_l, word_idx
             piece = piece_l[word_idx].split()
             word_idx += 1
             # if u"".join(piece) != u'\u2581'+c and c != '-LRB-' and c != '-RRB-':

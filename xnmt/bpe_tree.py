@@ -83,6 +83,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--tree_file", required=True, type=str)
     parser.add_argument("--piece_file", type=str)
+    parser.add_argument("--replace_file", type=str)
+    parser.add_argument("--root", type=str, default='ROOT')
     parser.add_argument("--max_iter", type=int, default=10)
     parser.add_argument("--out_file", type=str)
 
@@ -101,8 +103,14 @@ if __name__ == "__main__":
         tree_list.append(t.root)
     #for t in tree_list:
     #    print t.to_parse_string()
-
-    BPE(tree_list, max_iter=args.max_iter, root='ROOT')
+    if args.replace_file:
+        label = 1
+        with codecs.open(args.replace_file, encoding='utf-8') as myfile:
+            for line in myfile:
+                replace(tree_list, line, label)
+                label += 1
+    else:
+        BPE(tree_list, max_iter=args.max_iter, root=args.root)
 
     with codecs.open(args.out_file, encoding='utf-8', mode='w') as out:
         for t in tree_list:

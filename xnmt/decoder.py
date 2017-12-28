@@ -225,10 +225,14 @@ class TreeDecoder(RnnDecoder, Serializable):
                                                 model = param_col,
                                                 residual_to_output = residual_to_output)
     # MLP
-
-    self.context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
-                                                output_dim=mlp_hidden_dim,
-                                                model=param_col)
+    if self.set_word_lstm:
+      self.context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+                                                  output_dim=mlp_hidden_dim,
+                                                  model=param_col)
+    else:
+      self.context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
+                                                  output_dim=mlp_hidden_dim,
+                                                  model=param_col)
 
     self.vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
                                          output_dim = vocab_size,
@@ -362,9 +366,9 @@ class TreeDecoder(RnnDecoder, Serializable):
     :returns: Scores over the vocabulary given this state.
     """
     if self.set_word_lstm:
-      h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
-      #h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
-      #                                                     tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])))
+      #h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
+      h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
+                                                           tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])))
     else:
       h_t = dy.tanh(self.context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:

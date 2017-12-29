@@ -107,7 +107,7 @@ if __name__ == "__main__":
         label = 1
         with codecs.open(args.replace_file, encoding='utf-8') as myfile:
             for line in myfile:
-                replace(tree_list, line, label)
+                replace(tree_list, line.strip(), "%d" % label)
                 label += 1
     else:
         BPE(tree_list, max_iter=args.max_iter, root=args.root)

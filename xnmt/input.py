@@ -3,7 +3,7 @@ import os
 import io
 import six
 import re
-from collections import defaultdict
+from collections import deque
 from six.moves import zip_longest, map
 from xnmt.serializer import Serializable
 from xnmt.vocab import *
@@ -432,47 +432,36 @@ class TreeNode(object):
     def to_parse_string(self):
         c_str = []
         stack = [self]
-        add_paren_len = [0]
         while stack:
-            while add_paren_len[-1] == len(stack):
-                assert len(c_str) > 0
-                add_paren_len.pop()
-                c_str[-1] += u')'
             cur = stack.pop()
-            c_str.append(u'(' + cur.label)
+            while not hasattr(cur, 'label'):
+                c_str.append(cur)
+                if not stack: break
+                cur = stack.pop()
+            if not hasattr(cur, 'children'): break
+            stack.append(u')')
             for c in reversed(cur.children):
-                if type(c) == str or type(c) == unicode:
-                    c_str.append(c)
-                else:
-                    stack.append(c)
-                    add_paren_len.append(len(stack) - 1)
-        c_str[-1] += u')' * len(add_paren_len)
-        return u" ".join(c_str)
+                stack.append(c)
+            stack.append(u'({} '.format(cur.label) )
+        return u"".join(c_str)
 
     def to_string(self, piece=True):
         '''
     convert subtree into the sentence it represents
     '''
         toks = []
-
         stack = [self]
-        add_space_len = []
         while stack:
-            # sub_word = True
-            init_stack_len = len(stack)
-            if add_space_len and add_space_len[-1] == len(stack):
-                toks.append(u" ")
-                add_space_len.pop()
             cur = stack.pop()
+            while not hasattr(cur, 'label'):
+                toks.append(cur)
+                if not stack: break
+                cur = stack.pop()
+            if not hasattr(cur, 'children'): break
             for c in reversed(cur.children):
-                if type(c) == str or type(c) == unicode:
-                    toks.append(c)
-                else:
-                    stack.append(c)
-            if not "_sub" in cur.label and not piece:
-                add_space_len.append(init_stack_len - 1)
+                stack.append(c)
         if not piece:
-            return u"".join(toks)
+            return u" ".join(toks)
         else:
             return u"".join(toks).replace(u'\u2581', u' ').strip()
 

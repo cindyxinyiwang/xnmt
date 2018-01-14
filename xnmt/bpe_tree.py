@@ -138,8 +138,8 @@ if __name__ == "__main__":
     #    print t.to_parse_string()
     if args.replace_file:
         myfile = codecs.open(args.replace_file, encoding='utf-8')
+        label = 1
         while True:
-            label = 1
             line = myfile.readline()
             if not line: break
             par_rule = str_to_rule(line)

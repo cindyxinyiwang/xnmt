@@ -85,12 +85,16 @@ class Batcher(object):
     trg_id, trg_mask = pad(trg_curr, pad_token=self.trg_pad_token)
     trg_ret.append(Batch(trg_id, trg_mask))
 
-  def pack_by_order(self, src, trg, order):
+  def pack_by_order(self, src, trg, order, trg_len=None):
     src_ret, src_curr = [], []
     trg_ret, trg_curr = [], []
+    if trg_len:
+      trg_len_ret, trg_len_curr = [], []
     if self.granularity == 'sent':
       for x in six.moves.range(0, len(order), self.batch_size):
         self.add_single_batch([src[y] for y in order[x:x+self.batch_size]], [trg[y] for y in order[x:x+self.batch_size]], src_ret, trg_ret)
+        if trg_len:
+          trg_len_ret.append([trg_len[y] for y in order[x:x+self.batch_size]])
     elif self.granularity == 'word':
       my_size = 0
       for i in order:
@@ -100,11 +104,18 @@ class Batcher(object):
           my_size = len(src[i]) + len(trg[i])
           src_curr = []
           trg_curr = []
+          if trg_len:
+            trg_len_ret.append(trg_len_curr)
+            trg_len_curr = []
         src_curr.append(src[i])
         trg_curr.append(trg[i])
+        if trg_len:
+          trg_len_curr.append(trg_len[i])
       self.add_single_batch(src_curr, trg_curr, src_ret, trg_ret)
     else:
       raise RuntimeError("Illegal granularity specification {}".format(self.granularity))
+    if trg_len:
+      return src_ret, trg_ret, trg_len_ret
     return src_ret, trg_ret
 
 class InOrderBatcher(Batcher, Serializable):
@@ -115,19 +126,19 @@ class InOrderBatcher(Batcher, Serializable):
   def __init__(self, batch_size, src_pad_token=Vocab.ES, trg_pad_token=Vocab.ES):
     super(InOrderBatcher, self).__init__(batch_size, src_pad_token=src_pad_token, trg_pad_token=trg_pad_token)
 
-  def pack(self, src, trg):
+  def pack(self, src, trg, trg_len=None):
     order = list(range(len(src)))
-    return self.pack_by_order(src, trg, order)
+    return self.pack_by_order(src, trg, order, trg_len=trg_len)
 
 class ShuffleBatcher(Batcher):
   """
   A class to create batches through randomly shuffling without sorting.
   """
 
-  def pack(self, src, trg):
+  def pack(self, src, trg, trg_len=None):
     order = list(range(len(src)))
     np.random.shuffle(order)
-    return self.pack_by_order(src, trg, order)
+    return self.pack_by_order(src, trg, order, trg_len=trg_len)
 
   def is_random(self):
     return True
@@ -146,12 +157,12 @@ class SortBatcher(Batcher):
     self.sort_key = sort_key
     self.break_ties_randomly = break_ties_randomly
 
-  def pack(self, src, trg):
+  def pack(self, src, trg, trg_len=None):
     if self.break_ties_randomly:
       order = np.argsort([self.sort_key(x) + random.uniform(-SortBatcher.__tiebreaker_eps, SortBatcher.__tiebreaker_eps) for x in six.moves.zip(src,trg)])
     else:
       order = np.argsort([self.sort_key(x) for x in six.moves.zip(src,trg)])
-    return self.pack_by_order(src, trg, order)
+    return self.pack_by_order(src, trg, order, trg_len=trg_len)
 
   def is_random(self):
     return self.break_ties_randomly

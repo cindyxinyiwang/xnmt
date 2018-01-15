@@ -51,7 +51,7 @@ class LossTracker(object):
     self.sent_num_not_report_dev = 0
     self.last_report_words = 0
 
-  def update_epoch_loss(self, src, trg, loss):
+  def update_epoch_loss(self, src, trg, loss, trg_len=None):
     """
     Update epoch-wise counters for each iteration.
     """
@@ -59,7 +59,10 @@ class LossTracker(object):
     self.sent_num += batch_sent_num
     self.sent_num_not_report_train += batch_sent_num
     self.sent_num_not_report_dev += batch_sent_num
-    self.epoch_words += self.count_trg_words(trg)
+    if trg_len:
+      self.epoch_words += sum(trg_len)
+    else:
+      self.epoch_words += self.count_trg_words(trg)
     self.epoch_loss += loss
 
   def format_time(self, seconds):
@@ -90,7 +93,7 @@ class LossTracker(object):
 
       self.last_report_words = self.epoch_words
       self.last_report_train_time = this_report_time
-
+      #print(self.epoch_words)
       return print_report
 
   def new_dev(self):

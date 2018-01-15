@@ -131,10 +131,18 @@ class XnmtTrainer(object):
       self.logger = BatchLossTracker(args.dev_every, self.total_train_sent)
 
   def pack_batches(self):
-    self.train_src, self.train_trg = \
-      self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
-    self.dev_src, self.dev_trg = \
-      self.dev_batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
+    if self.training_corpus.train_ref_file:
+      self.train_src, self.train_trg, self.train_trg_len = \
+        self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data, self.training_corpus.train_trg_data_len)
+    else:
+      self.train_src, self.train_trg = \
+        self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
+    if self.training_corpus.dev_ref_file:
+      self.dev_src, self.dev_trg, self.dev_trg_len = \
+        self.dev_batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data, self.training_corpus.dev_trg_data_len)
+    else:
+      self.dev_src, self.dev_trg = \
+        self.dev_batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data)
     pass
 
   def dynet_trainer_for_args(self, args, model_context):
@@ -250,8 +258,10 @@ class XnmtTrainer(object):
       # Log the loss sum
       #print(standard_loss.dim())
       loss_value = loss_builder.compute()
-
-      self.logger.update_epoch_loss(src, trg, loss_builder)
+      if self.training_corpus.train_ref_file:
+        self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
+      else:
+        self.logger.update_epoch_loss(src, trg, loss_builder)
       if update_weights:
         loss_value.backward()
         self.trainer.update()
@@ -346,14 +356,17 @@ class XnmtTrainer(object):
     loss_builder = LossBuilder()
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
-    #for i in range(1):
-      #dy.renew_cg(immediate_compute=True)
       dy.renew_cg()
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
-      trg_words_cnt += self.logger.count_trg_words(self.dev_trg[i])
+      epoch_words = 0
+      if self.training_corpus.dev_ref_file:
+        epoch_words = sum(self.dev_trg_len[i])
+      else:
+        epoch_words = self.logger.count_trg_words(self.dev_trg[i])
+      trg_words_cnt += epoch_words
       loss_builder.compute()
-      #print(self.logger.count_trg_words(self.dev_trg[i]))
+      #print(epoch_words)
     #print("total %d" % trg_words_cnt)
     return trg_words_cnt, LossScore(loss_builder.sum() / trg_words_cnt)
 

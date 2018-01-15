@@ -6,7 +6,7 @@ class BilingualTrainingCorpus(Serializable):
   """
 
   yaml_tag = "!BilingualTrainingCorpus"
-  def __init__(self, train_src, train_trg, dev_src, dev_trg, train_id_file=None, dev_id_file=None, dev_ref_file=None):
+  def __init__(self, train_src, train_trg, dev_src, dev_trg, train_id_file=None, dev_id_file=None, train_ref_file=None, dev_ref_file=None):
     self.train_src = train_src
     self.train_trg = train_trg
     self.train_id_file = train_id_file
@@ -14,3 +14,4 @@ class BilingualTrainingCorpus(Serializable):
     self.dev_trg = dev_trg
     self.dev_id_file = dev_id_file
     self.dev_ref_file = dev_ref_file
+    self.train_ref_file = train_ref_file

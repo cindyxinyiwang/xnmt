@@ -263,6 +263,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
     def read_training_corpus(self, training_corpus):
         training_corpus.train_src_data = []
         training_corpus.train_trg_data = []
+
         if self.sample_train_sents:
             self.train_src_len = self.src_reader.count_sents(training_corpus.train_src)
             self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
@@ -279,10 +280,29 @@ class BilingualCorpusParser(CorpusParser, Serializable):
                 self.train_src_len, self.train_trg_len))
             filter_ids = list(range(min(self.max_num_train_sents, self.train_trg_len)))
         else:
+            self.train_trg_len = self.trg_reader.count_sents(training_corpus.train_trg)
             filter_ids = None
         src_train_iterator = self.src_reader.read_sents(training_corpus.train_src, filter_ids)
         trg_train_iterator = self.trg_reader.read_sents(training_corpus.train_trg, filter_ids)
-        for src_sent, trg_sent in six.moves.zip_longest(src_train_iterator, trg_train_iterator):
+        if training_corpus.train_ref_file:
+            train_trg_data_len = []
+            training_corpus.train_trg_data_len = []
+            sent_count = 0
+            max_id = None
+            if filter_ids is not None:
+                max_id = max(filter_ids)
+                filter_ids = set(filter_ids)
+            with io.open(training_corpus.train_ref_file, encoding='utf-8') as f:
+                for line in f:
+                    if filter_ids is None or sent_count in filter_ids:
+                        #yield line
+                        train_trg_data_len.append(len(line.split()))
+                    sent_count += 1
+                    if max_id is not None and sent_count > max_id:
+                        break
+        else:
+            train_trg_data_len = [0 for i in range(self.train_trg_len)]
+        for src_sent, trg_sent, trg_len in six.moves.zip_longest(src_train_iterator, trg_train_iterator, train_trg_data_len):
             if src_sent is None or trg_sent is None:
                 raise RuntimeError("training src sentences don't match trg sentences: %s != %s!" % (
                 self.train_src_len or self.src_reader.count_sents(training_corpus.train_src),
@@ -292,6 +312,8 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if src_len_ok and trg_len_ok:
                 training_corpus.train_src_data.append(src_sent)
                 training_corpus.train_trg_data.append(trg_sent)
+                if training_corpus.train_ref_file:
+                    training_corpus.train_trg_data_len.append(trg_len)
 
         self.src_reader.freeze()
         self.trg_reader.freeze()
@@ -305,11 +327,30 @@ class BilingualCorpusParser(CorpusParser, Serializable):
                 "dev src sentences don't match trg sentences: %s != %s!" % (self.dev_src_len, self.dev_trg_len))
             filter_ids = list(range(min(self.max_num_dev_sents, self.dev_src_len)))
         else:
+            self.dev_trg_len = self.dev_trg_len or self.trg_reader.count_sents(training_corpus.dev_trg)
             filter_ids = None
 
         src_dev_iterator = self.src_reader.read_sents(training_corpus.dev_src, filter_ids)
         trg_dev_iterator = self.trg_reader.read_sents(training_corpus.dev_trg, filter_ids)
-        for src_sent, trg_sent in six.moves.zip_longest(src_dev_iterator, trg_dev_iterator):
+        if training_corpus.dev_ref_file:
+            dev_trg_data_len = []
+            training_corpus.dev_trg_data_len = []
+            sent_count = 0
+            max_id = None
+            if filter_ids is not None:
+                max_id = max(filter_ids)
+                filter_ids = set(filter_ids)
+            with io.open(training_corpus.dev_ref_file, encoding='utf-8') as f:
+                for line in f:
+                    if filter_ids is None or sent_count in filter_ids:
+                        #yield line
+                        dev_trg_data_len.append(len(line.split()))
+                    sent_count += 1
+                    if max_id is not None and sent_count > max_id:
+                        break
+        else:
+            dev_trg_data_len = [0 for i in range(self.dev_trg_len)]
+        for src_sent, trg_sent, trg_len in six.moves.zip_longest(src_dev_iterator, trg_dev_iterator, dev_trg_data_len):
             if src_sent is None or trg_sent is None:
                 raise RuntimeError("dev src sentences don't match target trg: %s != %s!" % (
                 self.src_reader.count_sents(training_corpus.dev_src), self.dev_trg_len),
@@ -319,6 +360,8 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if src_len_ok and trg_len_ok:
                 training_corpus.dev_src_data.append(src_sent)
                 training_corpus.dev_trg_data.append(trg_sent)
+                if training_corpus.dev_ref_file:
+                    training_corpus.dev_trg_data_len.append(trg_len)
 
 
 class TreeInput(Input):
@@ -491,7 +534,6 @@ class TreeNode(object):
                 new_node.add_child(c)
         return new_node
 
-
     def frontir_nodes(self):
         frontir = []
         for c in self.children:
@@ -502,6 +544,15 @@ class TreeNode(object):
                     frontir.extend(c.frontir_nodes())
 
         return frontir
+
+    def leaf_nodes(self):
+        leaves = []
+        for c in self.children:
+            if hasattr(c, 'children'):
+                leaves.extend(c.leaf_nodes())
+            else:
+                leaves.append(c)
+        return leaves
 
     def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0, sib_t=0, open_stack=[]):
         '''

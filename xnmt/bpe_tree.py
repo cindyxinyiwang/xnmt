@@ -4,6 +4,58 @@ from collections import defaultdict, deque
 import codecs
 import argparse
 
+def construct(out_file):
+    ''' Construct merged bpe rules from bpe.out '''
+    def split(s, rule_dict, merged_set):
+        s = s.split(u'|||')
+        assert len(s) == 3, s
+        label, children, open_nonterms = s[0], s[1].split(), s[2].split()
+
+        if label in rule_dict:
+            merged_set.add(label)
+            return rule_dict[label].copy()
+        else:
+            node = TreeNode(label, [])
+        for c in children:
+            if c in open_nonterms:
+                if c in rule_dict:
+                    merged_set.add(c)
+                    node.add_child(rule_dict[c].copy())
+                else:
+                    n = TreeNode(c, [])
+                    node.add_child(n)
+            else:
+                node.add_child(c)
+        return node
+    myfile = codecs.open(out_file, encoding='utf-8')
+    label = 1
+    rule_dict = {}
+    merged_label = set()
+    while True:
+        line = myfile.readline()
+        if not line: break
+        par_node = split(line, rule_dict, merged_label)
+        child_node = split(myfile.readline(), rule_dict, merged_label)
+        myfile.readline()
+        # find all child_rule parent in par_rule child
+        # replace with child_rule children
+        for c in par_node.frontir_nodes():
+            if c.label == child_node.label:
+                #c = child_node
+                #print child_node.to_parse_string()
+                c.children = []
+                for i in child_node.children:
+                    if hasattr(i, 'copy'):
+                        c.children.append(i.copy())
+                    else:
+                        c.children.append(i)
+        rule_dict[str(label)] = par_node
+        label += 1
+
+    for i, r in rule_dict.items():
+        if i not in merged_label:
+            print r.to_parse_string()
+
 def get_rule(treenode):
     children, open_nonterms = [], []
     for c in treenode.children:
@@ -120,9 +172,13 @@ if __name__ == "__main__":
     parser.add_argument("--root", type=str, default='ROOT')
     parser.add_argument("--max_iter", type=int, default=10)
     parser.add_argument("--out_file", type=str)
+    parser.add_argument("--construct", action='store_true')
 
     args = parser.parse_args()
 
+    if args.construct:
+        construct(args.replace_file)
+        exit(0)
     tree_fp = codecs.open(args.tree_file, 'r', encoding='utf-8')
     tree_list = []
     if args.piece_file:

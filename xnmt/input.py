@@ -414,7 +414,7 @@ class TreeReader(BaseTextReader, Serializable):
 class TreeNode(object):
     """A class that represents a tree node object """
 
-    def __init__(self, string, children=[], timestep=-1, id=-1, last_word_t=0):
+    def __init__(self, string, children, timestep=-1, id=-1, last_word_t=0):
         self.label = string
         self.children = children
         for c in children:
@@ -474,13 +474,34 @@ class TreeNode(object):
     def add_child(self, child, id2n=None, last_word_t=0):
         self.children.append(child)
         if hasattr(child, "set_parent"):
-            child.set_parent(self)
+            child._parent = self
             child.last_word_t = last_word_t
             if id2n:
                 child.id = len(id2n)
                 id2n[child.id] = child
                 return child.id
         return -1
+
+    def copy(self):
+        new_node = TreeNode(self.label, [])
+        for c in self.children:
+            if hasattr(c, 'copy'):
+                new_node.add_child(c.copy())
+            else:
+                new_node.add_child(c)
+        return new_node
+
+
+    def frontir_nodes(self):
+        frontir = []
+        for c in self.children:
+            if hasattr(c, 'children'):
+                if len(c.children) == 0:
+                    frontir.append(c)
+                else:
+                    frontir.extend(c.frontir_nodes())
+
+        return frontir
 
     def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0, sib_t=0, open_stack=[]):
         '''

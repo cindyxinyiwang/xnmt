@@ -54,7 +54,7 @@ def construct(out_file):
 
     for i, r in rule_dict.items():
         if i not in merged_label:
-            print r.to_parse_string()
+            print r.to_parse_string().encode('utf-8')
 
 def get_rule(treenode):
     children, open_nonterms = [], []

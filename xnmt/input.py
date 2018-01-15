@@ -585,7 +585,7 @@ class Tree(object):
         copied_tree.open_nonterm_ids = self.open_nonterm_ids[:]
         copied_tree.last_word_t = self.last_word_t
 
-        root = TreeNode(u'trash')
+        root = TreeNode(u'trash', [])
         stack = [self.root]
         copy_stack = [root]
         while stack:
@@ -602,7 +602,7 @@ class Tree(object):
                 copied_tree.t2n[copy_cur.timestep] = copy_cur
             for c in cur.children:
                 if hasattr(c, 'set_parent'):
-                    copy_c = TreeNode(c.label)
+                    copy_c = TreeNode(c.label, [])
                     copy_cur.add_child(copy_c)
 
                     stack.append(c)
@@ -614,17 +614,8 @@ class Tree(object):
         return copied_tree
 
     @classmethod
-    def from_rule_deriv(cls, derivs):
+    def from_rule_deriv_v1(cls, derivs):
         tree = Tree()
-        # tree.id2n = {}
-        # tree.t2n = {}
-        # tree.open_nonterm_ids = []
-        # r0 = derivs[0]
-        # tree.root = TreeNode(r0.lhs, [child for child in r0.rhs if not child in r0.open_nonterms ])
-        # if len(r0.open_nonterms) == 0:
-        # assert len(derivs) == 1
-        #  return tree
-
         stack_tree = [tree.root]
         stack_children_left = [1]
 
@@ -650,7 +641,32 @@ class Tree(object):
         #   print str(d)
         return tree
 
-    def to_string(self, piece=True):
+    @classmethod
+    def from_rule_deriv(cls, derivs):
+        tree = Tree()
+        stack_tree = [tree.root]
+
+        for r in derivs:
+            p_tree = stack_tree.pop()
+            if p_tree.label == 'XXX':
+                new_tree = TreeNode(r.lhs, [])
+                p_tree.add_child(new_tree)
+            else:
+                assert p_tree.label == r.lhs, u"%s %s" % (p_tree.label, r.lhs)
+                new_tree = p_tree
+            open_nonterms = []
+            for child in r.rhs:
+                if child not in r.open_nonterms:
+                    new_tree.add_child(child)
+                else:
+                    n = TreeNode(child, [])
+                    new_tree.add_child(n)
+                    open_nonterms.append(n)
+            open_nonterms.reverse()
+            stack_tree.extend(open_nonterms)
+        return tree
+
+    def to_string(self, piece=False):
         '''
     convert subtree into the sentence it represents
     '''
@@ -871,7 +887,7 @@ def parse_root(toks):
 
 if __name__ == "__main__":
     # test on copy
-
+    '''
     s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
     tree = Tree(parse_root(tokenize(s)), binarize=True)
 
@@ -920,6 +936,7 @@ if __name__ == "__main__":
         print i, n.to_parse_string(), n.last_word_t
 
     print
+    '''
     rules = [Rule('ROOT', ['S'], ['S']), Rule('S', ['NP', 'VP', '.'], ['NP', 'VP', '.']), Rule('NP', ['NNP'], ['NNP']), \
              Rule('NNP', ['I'], []), Rule('VP', ['am'], []), Rule('.', ['.'], [])]
     tree = Tree.from_rule_deriv(rules)

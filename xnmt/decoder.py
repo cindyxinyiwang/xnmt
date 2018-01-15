@@ -174,7 +174,7 @@ class TreeDecoder(RnnDecoder, Serializable):
 
   def __init__(self, yaml_context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
-               rnn_spec="lstm", residual_to_output=False, input_feeding=True,
+               rnn_spec="lstm", residual_to_output=False, input_feeding=True, word_state_feeding=False,
                bridge=None, word_lstm=False, start_nonterm='ROOT', frontir_feeding=False):
     register_handler(self)
     param_col = yaml_context.dynet_param_collection.param_col
@@ -195,7 +195,10 @@ class TreeDecoder(RnnDecoder, Serializable):
       lstm_input += input_dim
     plain_lstm_input = lstm_input
     # parent state + last_word_state + frontir embedding
-    lstm_input += lstm_dim * 2
+    lstm_input += lstm_dim
+    self.word_state_feeding = word_state_feeding
+    if self.word_state_feeding:
+      lstm_input += lstm_dim
     self.frontir_feeding = frontir_feeding
     if frontir_feeding:
       lstm_input += tag_embed_dim
@@ -292,13 +295,15 @@ class TreeDecoder(RnnDecoder, Serializable):
       assert batch_size == 1
 
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
-      last_word_states = tree_dec_state.states[trg.get_col(2)]
       is_terminal = trg.get_col(3, batched=False)
-
       paren_tm1_state = paren_tm1_states[0]
-      last_word_state = last_word_states[0]
-      inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
 
+      if self.word_state_feeding:
+        last_word_states = tree_dec_state.states[trg.get_col(2)]
+        last_word_state = last_word_states[0]
+        inp = dy.concatenate([inp, paren_tm1_state, last_word_state])
+      else:
+        inp = dy.concatenate([inp, paren_tm1_state])
       if self.frontir_feeding:
         frontir_list = trg.get_col(5, batched=False)
         frontir_emb = tag_embedder.embed(frontir_list[0])
@@ -324,8 +329,10 @@ class TreeDecoder(RnnDecoder, Serializable):
           print c.label
       assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
       # find frontier node label
-      inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
-
+      if self.word_state_feeding:
+        inp = dy.concatenate([inp, cur_nonterm.parent_state, tree_dec_state.prev_word_state])
+      else:
+        inp = dy.concatenate([inp, cur_nonterm.parent_state])
       if self.frontir_feeding:
         frontir_emb = tag_embedder.embed(trg_rule_vocab.tag_vocab.convert(rule.lhs))
         inp = dy.concatenate([inp, frontir_emb])

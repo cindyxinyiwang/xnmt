@@ -203,8 +203,8 @@ class TreeDecoder(RnnDecoder, Serializable):
     if frontir_feeding:
       lstm_input += tag_embed_dim
 
-    #if word_lstm:
-    #  lstm_input += lstm_dim
+    if word_lstm:
+      lstm_input += lstm_dim
     self.init_lstm_dim = lstm_input - trg_embed_dim
 
     # Bridge
@@ -316,7 +316,7 @@ class TreeDecoder(RnnDecoder, Serializable):
           if self.input_feeding:
             word_inp = dy.concatenate([word_inp, tree_dec_state.word_context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
-        #inp = dy.concatenate([inp, word_rnn_state.output()])
+        inp = dy.concatenate([inp, word_rnn_state.output()])
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
@@ -344,7 +344,7 @@ class TreeDecoder(RnnDecoder, Serializable):
           if self.input_feeding:
             word_inp = dy.concatenate([word_inp, tree_dec_state.word_context])
           word_rnn_state = tree_dec_state.word_rnn_state.add_input(word_inp)
-        #inp = dy.concatenate([inp, word_rnn_state.output()])
+        inp = dy.concatenate([inp, word_rnn_state.output()])
 
       rnn_state = tree_dec_state.rnn_state.add_input(inp)
       # add rule to tree_dec_state.open_nonterms

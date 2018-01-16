@@ -284,7 +284,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             filter_ids = None
         src_train_iterator = self.src_reader.read_sents(training_corpus.train_src, filter_ids)
         trg_train_iterator = self.trg_reader.read_sents(training_corpus.train_trg, filter_ids)
-        if training_corpus.train_ref_file:
+        if training_corpus.train_len_file:
             train_trg_data_len = []
             training_corpus.train_trg_data_len = []
             sent_count = 0
@@ -292,7 +292,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if filter_ids is not None:
                 max_id = max(filter_ids)
                 filter_ids = set(filter_ids)
-            with io.open(training_corpus.train_ref_file, encoding='utf-8') as f:
+            with io.open(training_corpus.train_len_file, encoding='utf-8') as f:
                 for line in f:
                     if filter_ids is None or sent_count in filter_ids:
                         #yield line
@@ -312,7 +312,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if src_len_ok and trg_len_ok:
                 training_corpus.train_src_data.append(src_sent)
                 training_corpus.train_trg_data.append(trg_sent)
-                if training_corpus.train_ref_file:
+                if training_corpus.train_len_file:
                     training_corpus.train_trg_data_len.append(trg_len)
 
         self.src_reader.freeze()
@@ -332,7 +332,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
 
         src_dev_iterator = self.src_reader.read_sents(training_corpus.dev_src, filter_ids)
         trg_dev_iterator = self.trg_reader.read_sents(training_corpus.dev_trg, filter_ids)
-        if training_corpus.dev_ref_file:
+        if training_corpus.dev_len_file:
             dev_trg_data_len = []
             training_corpus.dev_trg_data_len = []
             sent_count = 0
@@ -340,7 +340,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if filter_ids is not None:
                 max_id = max(filter_ids)
                 filter_ids = set(filter_ids)
-            with io.open(training_corpus.dev_ref_file, encoding='utf-8') as f:
+            with io.open(training_corpus.dev_len_file, encoding='utf-8') as f:
                 for line in f:
                     if filter_ids is None or sent_count in filter_ids:
                         #yield line

@@ -131,13 +131,13 @@ class XnmtTrainer(object):
       self.logger = BatchLossTracker(args.dev_every, self.total_train_sent)
 
   def pack_batches(self):
-    if self.training_corpus.train_ref_file:
+    if self.training_corpus.train_len_file:
       self.train_src, self.train_trg, self.train_trg_len = \
         self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data, self.training_corpus.train_trg_data_len)
     else:
       self.train_src, self.train_trg = \
         self.batcher.pack(self.training_corpus.train_src_data, self.training_corpus.train_trg_data)
-    if self.training_corpus.dev_ref_file:
+    if self.training_corpus.dev_len_file:
       self.dev_src, self.dev_trg, self.dev_trg_len = \
         self.dev_batcher.pack(self.training_corpus.dev_src_data, self.training_corpus.dev_trg_data, self.training_corpus.dev_trg_data_len)
     else:
@@ -258,7 +258,7 @@ class XnmtTrainer(object):
       # Log the loss sum
       #print(standard_loss.dim())
       loss_value = loss_builder.compute()
-      if self.training_corpus.train_ref_file:
+      if self.training_corpus.train_len_file:
         self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
       else:
         self.logger.update_epoch_loss(src, trg, loss_builder)
@@ -293,7 +293,7 @@ class XnmtTrainer(object):
       output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
       # Copy Trg to Ref
       processed = []
-      if self.training_corpus.dev_ref_file:
+      if self.training_corpus.dev_len_file:
         with io.open(self.training_corpus.dev_ref_file, encoding=encoding) as fin:
           for line in fin:  
             processed.append(line)

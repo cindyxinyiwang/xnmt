@@ -293,7 +293,7 @@ class XnmtTrainer(object):
       output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
       # Copy Trg to Ref
       processed = []
-      if self.training_corpus.dev_len_file:
+      if self.training_corpus.dev_ref_file:
         with io.open(self.training_corpus.dev_ref_file, encoding=encoding) as fin:
           for line in fin:  
             processed.append(line)
@@ -360,7 +360,7 @@ class XnmtTrainer(object):
       standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
       epoch_words = 0
-      if self.training_corpus.dev_ref_file:
+      if self.training_corpus.dev_len_file:
         epoch_words = sum(self.dev_trg_len[i])
       else:
         epoch_words = self.logger.count_trg_words(self.dev_trg[i])

@@ -54,7 +54,7 @@ def construct(out_file):
 
     for i, r in rule_dict.items():
         if i not in merged_label:
-            print r.to_parse_string().encode('utf-8')
+            print i, r.to_parse_string().encode('utf-8')
 
 def get_rule(treenode):
     children, open_nonterms = [], []
@@ -173,6 +173,7 @@ if __name__ == "__main__":
     parser.add_argument("--max_iter", type=int, default=10)
     parser.add_argument("--out_file", type=str)
     parser.add_argument("--construct", action='store_true')
+    parser.add_argument("--binarize", action='store_true')
 
     args = parser.parse_args()
 
@@ -186,9 +187,9 @@ if __name__ == "__main__":
     for line in tree_fp:
         if args.piece_file:
             piece = piece_fp.readline()
-            t = Tree(parse_root(tokenize(line)), sent_piece=piece, binarize=True)
+            t = Tree(parse_root(tokenize(line)), sent_piece=piece, binarize=args.binarize)
         else:
-            t = Tree(parse_root(tokenize(line)), binarize=True)
+            t = Tree(parse_root(tokenize(line)), binarize=args.binarize)
         tree_list.append(t.root.children[0])   # Tree adds an extra xxx node as parent to each root node
     #for t in tree_list:
     #    print t.to_parse_string()

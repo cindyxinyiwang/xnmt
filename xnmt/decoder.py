@@ -174,7 +174,7 @@ class TreeDecoder(RnnDecoder, Serializable):
 
   def __init__(self, yaml_context, vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
-               rnn_spec="lstm", residual_to_output=False, input_feeding=True, word_state_feeding=False,
+               rnn_spec="lstm", residual_to_output=False, input_feeding=True, word_state_feeding=True,
                bridge=None, word_lstm=False, start_nonterm='ROOT', frontir_feeding=False):
     register_handler(self)
     param_col = yaml_context.dynet_param_collection.param_col

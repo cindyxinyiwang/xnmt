@@ -177,7 +177,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       embeddings = self.src_embedder.embed_sent(src)
       encodings = self.encoder(embeddings)
       self.attender.init_sent(encodings)
-      self.word_attender.init_sent(encodings)
+      if self.word_attender:
+        self.word_attender.init_sent(encodings)
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
       if isinstance(self.decoder, TreeDecoder):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)

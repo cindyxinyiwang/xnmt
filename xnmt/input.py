@@ -360,7 +360,7 @@ class BilingualCorpusParser(CorpusParser, Serializable):
             if src_len_ok and trg_len_ok:
                 training_corpus.dev_src_data.append(src_sent)
                 training_corpus.dev_trg_data.append(trg_sent)
-                if training_corpus.dev_ref_file:
+                if training_corpus.dev_len_file:
                     training_corpus.dev_trg_data_len.append(trg_len)
 
 

@@ -414,14 +414,15 @@ class TreeReader(BaseTextReader, Serializable):
                 tree = Tree(parse_root(tokenize(line)))
                 if self.binarize:
                     tree.root = right_binarize(tree.root)
-                split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
+                # add x after bpe
+                split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
                 add_preterminal(tree.root)
                 tree.reset_timestep()
                 yield TreeInput(tree.get_data_root(self.vocab))
         else:
             for line in self.iterate_filtered(filename[0], filter_ids):
                 #tree = Tree(parse_root(tokenize(line)), binarize=self.binarize)
-                tree = Tree(parse_root(tokenize(parse)))
+                tree = Tree(parse_root(tokenize(line)))
                 tree.root = TreeNode(u'XXX', [tree.root])
                 if self.binarize:
                     tree.root = right_binarize(tree.root)
@@ -862,16 +863,20 @@ def split_sent_piece(root, piece_l, word_idx):
             # if u"".join(piece) != u'\u2581'+c and c != '-LRB-' and c != '-RRB-':
             #  print c.decode('utf-8').split()
             #  print piece
-            if len(piece) == 1:
-                n = TreeNode(u'x', piece)
-                n._parent = root
-                new_children.append(n)
-                continue
-            for p in piece:
-                n = TreeNode(u'x', [p])
-                r = TreeNode(root.label + u"_sub", [n])
-                r._parent = root
-                new_children.append(r)
+            new_children.extend(piece)
+            #if len(piece) == 1:
+                #n = TreeNode(u'x', piece)
+                #n._parent = root
+                #new_children.append(n)
+                #new_children.append(piece[0])
+                #continue
+            #for p in piece:
+                #n = TreeNode(u'x', [p])
+                #r = TreeNode(root.label + u"_sub", [n])
+                #r._parent = root
+                #r = TreeNode(root.label, [p])
+                #r._parent = root
+                #new_children.append(r)
         else:
             word_idx = split_sent_piece(c, piece_l, word_idx)
             new_children.append(c)
@@ -1032,24 +1037,27 @@ if __name__ == "__main__":
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
-
+    '''
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         t.root = TreeNode(u'XXX', [t.root])
         #t.root = right_binarize(t.root)
-        split_sent_piece(t.root, sent_piece_segs(piece), 0)
+        
         add_preterminal(t.root)
+        split_sent_piece(t.root, sent_piece_segs(piece), 0)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
+    '''
+    s = u"(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
+    piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
+    tree = Tree(parse_root(tokenize(s)))
+    tree.root = TreeNode(u'XXX', [tree.root])
 
-    #s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
-    #tree = Tree(parse_root(tokenize(s)))
-    #tree.root = TreeNode(u'XXX', [tree.root])
-    #add_preterminal(tree.root)
-
-    #tree.reset_timestep()
-    #tree.get_data_root(rule_vocab)
-
+    split_sent_piece(tree.root, sent_piece_segs(piece), 0)
+    add_preterminal(tree.root)
+    tree.reset_timestep()
+    tree.get_data_root(rule_vocab)
+    print tree.to_parse_string()
     idx_list = rule_vocab.rule_index_with_lhs('*')
     print len(idx_list)
     print rule_vocab[idx_list[0]]

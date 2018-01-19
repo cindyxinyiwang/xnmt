@@ -398,9 +398,10 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, binarize=True):
+    def __init__(self, vocab=None, binarize=True, del_preterm_POS=False):
         self.vocab = vocab
         self.binarize = binarize
+        self.del_preterm_POS = del_preterm_POS
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -412,18 +413,20 @@ class TreeReader(BaseTextReader, Serializable):
         if len(filename) > 1:
             for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
                 tree = Tree(parse_root(tokenize(line)))
+                if self.del_preterm_POS:
+                    remove_preterminal_POS(tree.root)
+                split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
                 if self.binarize:
                     tree.root = right_binarize(tree.root)
                 # add x after bpe
-                split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
                 add_preterminal(tree.root)
                 tree.reset_timestep()
                 yield TreeInput(tree.get_data_root(self.vocab))
         else:
             for line in self.iterate_filtered(filename[0], filter_ids):
-                #tree = Tree(parse_root(tokenize(line)), binarize=self.binarize)
                 tree = Tree(parse_root(tokenize(line)))
-                tree.root = TreeNode(u'XXX', [tree.root])
+                if self.del_preterm_POS:
+                    remove_preterminal_POS(tree.root)
                 if self.binarize:
                     tree.root = right_binarize(tree.root)
                 add_preterminal(tree.root)
@@ -915,6 +918,15 @@ def add_preterminal(root):
             root.children[i] = n
         else:
             add_preterminal(c)
+
+def remove_preterminal_POS(root):
+    ''' Remove the POS tag before terminal '''
+    for i, c in enumerate(root.children):
+        if c.is_preterminal():
+            root.children[i] = c.children[0]
+        else:
+            remove_preterminal_POS(c)
+
 # Tokenize a string.
 # Tokens yielded are of the form (type, string)
 # Possible values for 'type' are '(', ')' and 'WORD'
@@ -1051,9 +1063,10 @@ if __name__ == "__main__":
     s = u"(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
     tree = Tree(parse_root(tokenize(s)))
-    tree.root = TreeNode(u'XXX', [tree.root])
-
+    # 1. remove pos tag 2. split sentence piece, 3. right binarize 4. add x preterminal
+    remove_preterminal_POS(tree.root)
     split_sent_piece(tree.root, sent_piece_segs(piece), 0)
+    tree.root = right_binarize(tree.root)
     add_preterminal(tree.root)
     tree.reset_timestep()
     tree.get_data_root(rule_vocab)

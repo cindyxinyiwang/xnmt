@@ -7,6 +7,7 @@ from collections import deque
 from six.moves import zip_longest, map
 from xnmt.serializer import Serializable
 from xnmt.vocab import *
+import codecs
 
 
 ###### Classes representing single inputs
@@ -410,13 +411,22 @@ class TreeReader(BaseTextReader, Serializable):
         filename = filename.split(',')
         if len(filename) > 1:
             for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
-                tree = Tree(parse_root(tokenize(line)), sent_piece=sent_piece, binarize=self.binarize)
-                # yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5])
+                tree = Tree(parse_root(tokenize(line)))
+                if self.binarize:
+                    tree.root = right_binarize(tree.root)
+                split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
+                add_preterminal(tree.root)
+                tree.reset_timestep()
                 yield TreeInput(tree.get_data_root(self.vocab))
         else:
             for line in self.iterate_filtered(filename[0], filter_ids):
-                tree = Tree(parse_root(tokenize(line)), binarize=self.binarize)
-                # yield TreeInput(tree.get_data_root(self.vocab) + [ [self.vocab.convert(Vocab.ES_STR)]*5 ])
+                #tree = Tree(parse_root(tokenize(line)), binarize=self.binarize)
+                tree = Tree(parse_root(tokenize(parse)))
+                tree.root = TreeNode(u'XXX', [tree.root])
+                if self.binarize:
+                    tree.root = right_binarize(tree.root)
+                add_preterminal(tree.root)
+                tree.reset_timestep()
                 yield TreeInput(tree.get_data_root(self.vocab))
 
     def freeze(self):
@@ -607,11 +617,11 @@ class Tree(object):
         self.last_word_t = -1
         if root:
             self.root = TreeNode(u'XXX', [root])
-            if sent_piece:
-                split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
-            if binarize:
-                self.root = right_binarize(self.root)
-            self.root.set_timestep(0, self.t2n, self.id2n, open_stack=['XXX'])
+            #if sent_piece:
+            #    split_sent_piece(self.root, sent_piece_segs(sent_piece), 0)
+            #if binarize:
+            #    self.root = right_binarize(self.root)
+            #self.root.set_timestep(0, self.t2n, self.id2n, open_stack=['XXX'])
         else:
             self.last_word_t = 0
             self.root = TreeNode(u'XXX', [], id=0, timestep=0)
@@ -621,6 +631,8 @@ class Tree(object):
             # if id >= 0:
             #  self.open_nonterm_ids.append(id)
             #self.open_nonterm_ids.append(0)
+    def reset_timestep(self):
+        self.root.set_timestep(0, self.t2n, self.id2n, open_stack=['XXX'])
 
     def __str__(self):
         return self.root.to_parse_string()
@@ -888,7 +900,16 @@ def right_binarize(root):
         root.children = [right_binarize(root.children[0]), right_binarize(n_left_child)]
     return root
 
+def add_preterminal(root):
+    ''' Add preterminal X before each terminal symbol '''
 
+    for i, c in enumerate(root.children):
+        if type(c) == str or type(c) == unicode:
+            n = TreeNode(u'*', [c])
+            n.set_parent(root)
+            root.children[i] = n
+        else:
+            add_preterminal(c)
 # Tokenize a string.
 # Tokens yielded are of the form (type, string)
 # Possible values for 'type' are '(', ')' and 'WORD'
@@ -988,6 +1009,8 @@ if __name__ == "__main__":
 
     print
     '''
+
+    '''
     rules = [Rule('ROOT', ['S'], ['S']), Rule('S', ['NP', 'VP', '.'], ['NP', 'VP', '.']), Rule('NP', ['NNP'], ['NNP']), \
              Rule('NNP', ['I'], []), Rule('VP', ['am'], []), Rule('.', ['.'], [])]
     tree = Tree.from_rule_deriv(rules)
@@ -1001,6 +1024,37 @@ if __name__ == "__main__":
     r = Rule('ROOT', ['S'], ['S'])
     print isinstance(r, Rule)
     print u"{}\n".format(r)
+    '''
+
+
+    train_parse = "kftt_data/tok/kyoto-train.lowparse.en"
+    train_piece = "kftt_data/tok/kyoto-train.lowpiece.en"
+    parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
+    piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
+    rule_vocab = RuleVocab()
+
+    for parse, piece in zip(parse_fp, piece_fp):
+        t = Tree(parse_root(tokenize(parse)))
+        t.root = TreeNode(u'XXX', [t.root])
+        #t.root = right_binarize(t.root)
+        split_sent_piece(t.root, sent_piece_segs(piece), 0)
+        add_preterminal(t.root)
+        t.reset_timestep()
+        t.get_data_root(rule_vocab)
+
+    #s = "(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
+    #tree = Tree(parse_root(tokenize(s)))
+    #tree.root = TreeNode(u'XXX', [tree.root])
+    #add_preterminal(tree.root)
+
+    #tree.reset_timestep()
+    #tree.get_data_root(rule_vocab)
+
+    idx_list = rule_vocab.rule_index_with_lhs('*')
+    print len(idx_list)
+    print rule_vocab[idx_list[0]]
+    print 'vocab size: ', len(rule_vocab)
+
 
 ###### Obsolete Functions
 

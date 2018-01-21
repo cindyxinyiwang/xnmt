@@ -13,12 +13,12 @@ from xnmt.events import register_xnmt_event_assign, register_handler
 from xnmt.generator import GeneratorModel
 from xnmt.serializer import Serializable, DependentInitParam
 from xnmt.search_strategy import BeamSearch, GreedySearch
-from xnmt.output import TextOutput
+from xnmt.output import TextOutput, TreeHierOutput
 from xnmt.reports import Reportable
 import xnmt.serializer
 from xnmt.batcher import mark_as_batch, is_batched
 from xnmt.loss import LossBuilder
-from xnmt.decoder import TreeDecoder
+from xnmt.decoder import TreeDecoder, TreeHierDecoder
 
 # Reporting purposes
 from lxml import etree
@@ -56,7 +56,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
 
   yaml_tag = u'!DefaultTranslator'
 
-  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder, loop_trg=False, tag_embedder=None, word_attender=None):
+  def __init__(self, src_embedder, encoder, attender, trg_embedder, decoder, loop_trg=False, tag_embedder=None, word_attender=None, word_embedder=None):
     '''Constructor.
 
     :param src_embedder: A word embedder for the input language
@@ -74,7 +74,11 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     self.loop_trg = loop_trg
     self.tag_embedder = tag_embedder
     self.word_attender = word_attender
+    self.word_embedder = word_embedder
     if isinstance(decoder, TreeDecoder) and decoder.set_word_lstm:
+      assert word_attender
+    if isinstance(decoder, TreeHierDecoder):
+      assert word_embedder
       assert word_attender
 
   def shared_params(self):
@@ -89,6 +93,12 @@ class DefaultTranslator(Translator, Serializable, Reportable):
             DependentInitParam(param_descr="trg_embedder.vocab_size", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab_size()),
             DependentInitParam(param_descr="src_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.src_reader.vocab),
             DependentInitParam(param_descr="trg_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab)]
+    if hasattr(self, 'word_embedder'):
+      ret += [DependentInitParam(param_descr="word_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab.word_vocab),
+              DependentInitParam(param_descr="word_embedder.vocab_size",
+                                 value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.word_vocab_size()),
+              DependentInitParam(param_descr="decoder.word_vocab_size",
+                                 value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.word_vocab_size())]
     if hasattr(self, 'tag_embedder'):
       ret += [DependentInitParam(param_descr="tag_embedder.vocab", value_fct=lambda: self.yaml_context.corpus_parser.trg_reader.vocab.tag_vocab),
               DependentInitParam(param_descr="tag_embedder.vocab_size",
@@ -115,7 +125,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
   def initialize_training_strategy(self, training_strategy):
     self.loss_calculator = training_strategy
 
-  def calc_loss(self, src, trg, trg_rule_vocab=None):
+  def calc_loss(self, src, trg, trg_rule_vocab=None, word_vocab=None):
     """
     :param src: source sequence (unbatched, or batched + padded)
     :param trg: target sequence (unbatched, or batched + padded); losses will be accumulated only if trg_mask[batch,pos]==0, or no mask is set
@@ -149,7 +159,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         #dec_state = self.decoder.initial_state([final_state.pick_batch_elem(i) for final_state in enc_final_state], emb_ss)
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), emb_ss)
         #loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, pick_src_elem=i, trg_rule_vocab=trg_rule_vocab))
-        loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, trg_rule_vocab=trg_rule_vocab))
+        loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg,
+                                         trg_rule_vocab=trg_rule_vocab, word_vocab=word_vocab))
         #dy.print_text_graphviz()
         #exit(0)
       return dy.esum(loss)
@@ -164,7 +175,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
       return self.loss_calculator(self, dec_state, src, trg, trg_rule_vocab=trg_rule_vocab)
 
-  def generate(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None):
+  def generate(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None, word_vocab=None):
     if hasattr(self.decoder, 'decoding'):
       self.decoder.decoding=True
     if not xnmt.batcher.is_batched(src):
@@ -180,13 +191,13 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       if self.word_attender:
         self.word_attender.init_sent(encodings)
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-      if isinstance(self.decoder, TreeDecoder):
+      if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
       else:
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
       output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents),
                                                                    forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab, tag_embedder=self.tag_embedder,
-                                                                   word_attender=self.word_attender)
+                                                                   word_attender=self.word_attender, word_embedder=self.word_embedder)
       # In case of reporting
       if self.report_path is not None:
         src_words = [self.reporting_src_vocab[w] for w in sents]
@@ -198,7 +209,10 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         self.generate_report(self.report_type)
       # Append output to the outputs
       if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
-        outputs.append(TextOutput(output_actions, self.trg_vocab))
+        if self.word_embedder:
+          outputs.append(TreeHierOutput(output_actions, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
+        else:
+          outputs.append(TextOutput(output_actions, self.trg_vocab))
       else:
         outputs.append((output_actions, score))
     return outputs

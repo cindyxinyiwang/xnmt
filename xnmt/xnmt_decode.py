@@ -74,6 +74,7 @@ def xnmt_decode(args, model_elements=None):
   # Vocab
   src_vocab = corpus_parser.src_reader.vocab if hasattr(corpus_parser.src_reader, "vocab") else None
   trg_vocab = corpus_parser.trg_reader.vocab if hasattr(corpus_parser.trg_reader, "vocab") else None
+  word_vocab = corpus_parser.trg_reader.word_vocab if hasattr(corpus_parser.trg_reader, "word_vocab") else None
   # Perform initialization
   generator.set_train(False)
   generator.initialize_generator(**args.params_as_dict)
@@ -101,7 +102,7 @@ def xnmt_decode(args, model_elements=None):
       else:
         dy.renew_cg()
         if rule_decode:
-          outputs_list= generator.generate_output(src, i, trg_rule_vocab=trg_vocab)
+          outputs_list= generator.generate_output(src, i, trg_rule_vocab=trg_vocab, word_vocab=word_vocab)
           # output both the parse trees and sentence
           outputs, tree = outputs_list[0], outputs_list[1]
           trg_parse.write(u"{}\n".format(tree))

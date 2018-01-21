@@ -398,17 +398,24 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, binarize=True, del_preterm_POS=False):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False ):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
+        self.word_vocab = word_vocab
+        self.read_word = read_word
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
+        if word_vocab is not None:
+            self.word_vocab.freeze()
+            self.word_vocab.set_unk(Vocab.UNK_STR)
 
     def read_sents(self, filename, filter_ids=None):
         if self.vocab is None:
             self.vocab = RuleVocab()
+        if self.read_word and self.word_vocab is None:
+            self.word_vocab = Vocab()
         filename = filename.split(',')
         if len(filename) > 1:
             for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
@@ -416,24 +423,39 @@ class TreeReader(BaseTextReader, Serializable):
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
                 split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
-                if self.binarize:
-                    tree.root = right_binarize(tree.root)
                 # add x after bpe
-                add_preterminal(tree.root)
+                if self.word_vocab:
+                    add_preterminal_wordswitch(tree.root)
+                    if self.binarize:
+                        tree.root = right_binarize(tree.root, self.read_word)
+                else:
+                    if self.binarize:
+                        tree.root = right_binarize(tree.root, self.read_word)
+                    add_preterminal(tree.root)
                 tree.reset_timestep()
-                yield TreeInput(tree.get_data_root(self.vocab))
+                yield TreeInput(tree.get_data_root(self.vocab, self.word_vocab))
         else:
             for line in self.iterate_filtered(filename[0], filter_ids):
                 tree = Tree(parse_root(tokenize(line)))
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
-                if self.binarize:
-                    tree.root = right_binarize(tree.root)
-                add_preterminal(tree.root)
+
+                if self.word_vocab:
+                    add_preterminal_wordswitch(tree.root)
+                    if self.binarize:
+                        tree.root = right_binarize(tree.root, self.read_word)
+                else:
+                    if self.binarize:
+                        tree.root = right_binarize(tree.root, self.read_word)
+                    add_preterminal(tree.root)
                 tree.reset_timestep()
-                yield TreeInput(tree.get_data_root(self.vocab))
+                yield TreeInput(tree.get_data_root(self.vocab, self.word_vocab))
 
     def freeze(self):
+        if self.word_vocab:
+            self.word_vocab.freeze()
+            self.word_vocab.set_unk(Vocab.UNK_STR)
+            self.overwrite_serialize_param('word_vocab', self.word_vocab)
         self.vocab.freeze()
         self.vocab.set_unk(Vocab.UNK_STR)
         self.overwrite_serialize_param("vocab", self.vocab)
@@ -447,6 +469,8 @@ class TreeReader(BaseTextReader, Serializable):
     def tag_vocab_size(self):
         return len(self.vocab.tag_vocab)
 
+    def word_vocab_size(self):
+        return len(self.word_vocab)
     def iterate_filtered_double(self, file1, file2, filter_ids=None):
         """
     :param filename: data file (text file)
@@ -598,10 +622,11 @@ class TreeNode(object):
             self.frontir_label = open_stack[-1]
         else:
             self.frontir_label = Vocab.ES_STR
-
+        c_t = t
         for c in self.children:
-            c_t = t + 1  # time of current child
+            #c_t = t + 1  # time of current child
             if hasattr(c, 'set_timestep'):
+                c_t = t + 1
                 t, next_word_t = c.set_timestep(c_t, t2n, id2n, next_word_t, sib_t, open_stack)
             else:
                 next_word_t = t
@@ -712,13 +737,27 @@ class Tree(object):
     def from_rule_deriv(cls, derivs):
         tree = Tree()
         stack_tree = [tree.root]
-
         for r in derivs:
             p_tree = stack_tree.pop()
+            if type(r) != Rule:
+                assert p_tree.label == u'*', p_tree.label
+                if r != Vocab.ES_STR:
+                    p_tree.add_child(r)
+                    stack_tree.append(p_tree)
+                continue
             if p_tree.label == 'XXX':
                 new_tree = TreeNode(r.lhs, [])
                 p_tree.add_child(new_tree)
             else:
+                if p_tree.label != r.lhs:
+                    for i in derivs:
+                        if type(i) != Rule:
+                            print i.encode('utf-8')
+                        else:
+                            print i
+                    print tree.to_parse_string().encode('utf-8')
+                    print p_tree.label.encode('utf-8'), r.lhs.encode('utf-8')
+                    exit(1)
                 assert p_tree.label == r.lhs, u"%s %s" % (p_tree.label, r.lhs)
                 new_tree = p_tree
             open_nonterms = []
@@ -776,7 +815,7 @@ class Tree(object):
         data.append(self.id2n[id].last_word_t)
         return data
 
-    def get_data_root(self, rule_vocab):
+    def get_data_root(self, rule_vocab, word_vocab=None):
         data = []
         for t in xrange(1, len(self.t2n)):
             node = self.t2n[t]
@@ -789,11 +828,15 @@ class Tree(object):
                     open_nonterms.append(c.label)
             paren_t = 0 if not node.parent() else node.parent().timestep
             is_terminal = 1 if len(open_nonterms) == 0 else 0
-
-            d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
-                 node.last_word_t, is_terminal,
-                 rule_vocab.tag_vocab.convert(node.frontir_label), rule_vocab.tag_vocab.convert(node.label)]
-            data.append(d)
+            if word_vocab and is_terminal:
+                for c in node.children:
+                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal]
+                    data.append(d)
+            else:
+                d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
+                    node.last_word_t, is_terminal,
+                    rule_vocab.tag_vocab.convert(node.frontir_label), rule_vocab.tag_vocab.convert(node.label)]
+                data.append(d)
         return data
 
     def get_bpe_rule(self, rule_vocab):
@@ -887,11 +930,14 @@ def split_sent_piece(root, piece_l, word_idx):
     return word_idx
 
 
-def right_binarize(root):
+def right_binarize(root, read_word=False):
     '''
   Right binarize a CusTree object
+  read_word: if true, do not binarize terminal rules
   '''
     if type(root) == str or type(root) == unicode:
+        return root
+    if read_word and root.label == u'*':
         return root
     if len(root.children) <= 2:
         new_children = []
@@ -918,6 +964,31 @@ def add_preterminal(root):
             root.children[i] = n
         else:
             add_preterminal(c)
+
+def add_preterminal_wordswitch(root):
+    ''' Add preterminal X before each terminal symbol '''
+    ''' word_switch: one * symbol for each phrase chunk
+        preterm_paren: * preterm parent already created
+    '''
+    preterm_paren = None
+    new_children = []
+    for i, c in enumerate(root.children):
+        if type(c) == str or type(c) == unicode:
+            if not preterm_paren:
+                preterm_paren = TreeNode(u'*', [])
+                preterm_paren.set_parent(root)
+                new_children.append(preterm_paren)
+            preterm_paren.add_child(c)
+        else:
+            if preterm_paren:
+                preterm_paren.add_child(Vocab.ES_STR)
+            c = add_preterminal_wordswitch(c)
+            new_children.append(c)
+            preterm_paren = None
+    if preterm_paren:
+        preterm_paren.add_child(Vocab.ES_STR)
+    root.children = new_children
+    return root
 
 def remove_preterminal_POS(root):
     ''' Remove the POS tag before terminal '''
@@ -1049,6 +1120,7 @@ if __name__ == "__main__":
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
+    word_vocab = Vocab()
     '''
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
@@ -1062,18 +1134,27 @@ if __name__ == "__main__":
     '''
     s = u"(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
+    #s = u"(ROOT (S (NP (FW i)) (VP (VBD heard) (SBAR (IN that) (S (NP (PRP he)) (VP (VBD gave) (NP (PRP himself)) (PRT (RP up)) (PP (TO to) (NP (DT the) (NN police))))))) (. .)) )"
     tree = Tree(parse_root(tokenize(s)))
     # 1. remove pos tag 2. split sentence piece, 3. right binarize 4. add x preterminal
     remove_preterminal_POS(tree.root)
     split_sent_piece(tree.root, sent_piece_segs(piece), 0)
-    tree.root = right_binarize(tree.root)
-    add_preterminal(tree.root)
+
+    tree.root = add_preterminal_wordswitch(tree.root)
+    #tree.root = right_binarize(tree.root)
     tree.reset_timestep()
-    tree.get_data_root(rule_vocab)
+    data = tree.get_data_root(rule_vocab, word_vocab)
+    for d in data:
+        print d
+        if d[3] == 0:
+            print rule_vocab[d[0]]
+        else:
+            print word_vocab[d[0]]
     print tree.to_parse_string()
-    idx_list = rule_vocab.rule_index_with_lhs('*')
-    print len(idx_list)
-    print rule_vocab[idx_list[0]]
+    print tree.to_string()
+    #idx_list = rule_vocab.rule_index_with_lhs('*')
+    #print len(idx_list)
+    #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
 
 

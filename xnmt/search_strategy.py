@@ -56,7 +56,7 @@ class BeamSearch(SearchStrategy):
     def __repr__(self):
       return "hypo S=%s |ids|=%s" % (self.score, len(self.id_list))
 
-  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None,
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, word_embedder=None,
                       forced_trg_ids=None, trg_rule_vocab=None, tag_embedder=None, word_attender=None):
     """
     :param decoder: decoder.Decoder subclass
@@ -83,8 +83,15 @@ class BeamSearch(SearchStrategy):
         dec_state = hyp.state
         if length > 0: # don't feed in the initial start-of-sentence token
           if trg_rule_vocab:
-            dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]),
-                                          hyp.id_list[-1], trg_rule_vocab, tag_embedder)
+            if word_embedder:
+              dec_state = decoder.add_input(dec_state,
+                hyp.id_list[-1][0] if forced_trg_ids is None else forced_trg_ids[length - 1],
+                                            word_embedder,
+                                            output_embedder,
+                                            trg_rule_vocab=trg_rule_vocab, tag_embedder=tag_embedder)
+            else:
+              dec_state = decoder.add_input(dec_state, output_embedder.embed(hyp.id_list[-1] if forced_trg_ids is None else forced_trg_ids[length-1]),
+                                           hyp.id_list[-1], trg_rule_vocab, tag_embedder)
             if len(dec_state.open_nonterms) == 0:
               # only know if the stack is empty after we add the current rule back to the tree
               completed_hyp.append(hyp)
@@ -100,12 +107,15 @@ class BeamSearch(SearchStrategy):
           if decoder.set_word_lstm:
             dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
-          score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
+          if word_embedder:
+            score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab, is_terminal=dec_state.open_nonterms[-1].label == u'*')
+          else:
+            score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
           score = dy.log_softmax(score).npvalue()
         else:
           score = dy.log_softmax(decoder.get_scores(dec_state)).npvalue()
         if forced_trg_ids is None:
-          if trg_rule_vocab:
+          if trg_rule_vocab and num_valid_rule >= 0:
             top_ids = np.argpartition(score, max(-num_valid_rule,-self.beam_size))[-min(self.beam_size, num_valid_rule):]
           else:
             top_ids = np.argpartition(score, max(-len(score),-self.beam_size))[-self.beam_size:]
@@ -114,7 +124,10 @@ class BeamSearch(SearchStrategy):
 
         for cur_id in top_ids:
           new_list = list(hyp.id_list)
-          new_list.append(cur_id)
+          if word_embedder:
+            new_list.append([cur_id, dec_state.open_nonterms[-1].label == u'*'])
+          else:
+            new_list.append(cur_id)
           if trg_rule_vocab:
             if score[cur_id] == -np.inf: continue
             new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state.copy()))
@@ -122,7 +135,7 @@ class BeamSearch(SearchStrategy):
             new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
       length += 1
       
-      if trg_rule_vocab:
+      if trg_rule_vocab and num_valid_rule >= 0:
         active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:min(self.beam_size, num_valid_rule)]
       else:
         active_hyp = sorted(new_set, key=lambda x: x.score, reverse=True)[:self.beam_size]
@@ -131,6 +144,11 @@ class BeamSearch(SearchStrategy):
       completed_hyp = active_hyp
 
     self.len_norm.normalize_completed(completed_hyp, src_length)
-
-    result = sorted(completed_hyp, key=lambda x: x.score, reverse=True)[0]
-    return result.id_list, result.score
+    if completed_hyp:
+      result = sorted(completed_hyp, key=lambda x: x.score, reverse=True)[0]
+      return result.id_list, result.score
+    else:
+      if word_embedder:
+        return [[Vocab.ES, True]], [0]
+      else:
+        return [Vocab.ES], [0]

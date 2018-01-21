@@ -24,14 +24,14 @@ class TrainingStrategy(Serializable):
     else:
       self.loss_calculator = loss_calculator
 
-  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1, trg_rule_vocab=None):
-      return self.loss_calculator(translator, dec_state, src, trg, pick_src_elem, trg_rule_vocab)
+  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1, trg_rule_vocab=None, word_vocab=None):
+      return self.loss_calculator(translator, dec_state, src, trg, pick_src_elem, trg_rule_vocab, word_vocab)
 
 
 class TrainingMLELoss(Serializable):
   yaml_tag = '!TrainingMLELoss'
 
-  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1, trg_rule_vocab=None):
+  def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1, trg_rule_vocab=None, word_vocab=None):
     trg_mask = trg.mask if xnmt.batcher.is_batched(trg) else None
     losses = []
     seq_len = len(trg[0]) if xnmt.batcher.is_batched(src) else len(trg)
@@ -62,8 +62,17 @@ class TrainingMLELoss(Serializable):
       if i < seq_len-1:
         if trg_is_list:
           word = ref_word.get_col(0) if type(ref_word[0]) == list else ref_word
-          dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word),
-                                                   ref_word, trg_rule_vocab=trg_rule_vocab, tag_embedder=translator.tag_embedder)
+          if translator.word_embedder:
+            dec_state = translator.decoder.add_input(dec_state, ref_word, word_embedder=translator.word_embedder,
+                                                     rule_embedder=translator.trg_embedder,
+                                                     trg_rule_vocab=trg_rule_vocab,
+                                                     tag_embedder=translator.tag_embedder,
+                                                     word_vocab=word_vocab)
+          else:
+            dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word),
+                                                   ref_word,
+                                                   trg_rule_vocab=trg_rule_vocab,
+                                                   tag_embedder=translator.tag_embedder)
         else:
           dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(ref_word))      
     return dy.esum(losses)

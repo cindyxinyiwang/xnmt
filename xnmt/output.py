@@ -22,6 +22,22 @@ class TextOutput(Output):
   def to_string(self):
     return six.moves.map(lambda wi: self.vocab[wi], filter(lambda wi: wi not in self.filtered_tokens, self.actions))
 
+class TreeHierOutput(Output):
+  def __init__(self, actions=None, rule_vocab=None, word_vocab=None):
+    self.actions = actions or []
+    self.rule_vocab = rule_vocab
+    self.word_vocab = word_vocab
+    self.filtered_tokens = set([Vocab.SS, Vocab.ES])
+  def to_string(self):
+    ret = []
+    for a in self.actions:
+      #if a[0] in self.filtered_tokens: continue
+      if a[1]: # if is terminal
+        ret.append(self.word_vocab[a[0]])
+      else:
+        ret.append(self.rule_vocab[a[0]])
+    return ret
+
 class OutputProcessor(object):
   def process_outputs(self, outputs):
     raise NotImplementedError()

@@ -565,7 +565,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
         inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
-        word_rnn_state = tree_dec_state.word_rnn_state.add_input(inp)
+        word_rnn_state = word_rnn_state.add_input(inp)
         rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                                         word_rnn_state.output()]))
         if trg == Vocab.ES:
@@ -583,7 +583,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
 
         inp = dy.concatenate([inp, cur_nonterm.parent_state, word_rnn_state.output()])
-        rnn_state = tree_dec_state.rnn_state.add_input(inp)
+        rnn_state = rnn_state.add_input(inp)
         # add rule to tree_dec_state.open_nonterms
         new_open_nonterms = []
         for rhs in rule.rhs:

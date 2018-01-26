@@ -398,12 +398,13 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False ):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=-1):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
         self.word_vocab = word_vocab
         self.read_word = read_word
+        self.merge = merge
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -423,6 +424,8 @@ class TreeReader(BaseTextReader, Serializable):
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
                 split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
+                if self.merge > 0:
+                    merge_depth(tree.root, self.merge, 0)
                 # add x after bpe
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
@@ -439,7 +442,8 @@ class TreeReader(BaseTextReader, Serializable):
                 tree = Tree(parse_root(tokenize(line)))
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
-
+                if self.merge > 0:
+                    merge_depth(tree.root, self.merge, 0)
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
                     if self.binarize:
@@ -998,6 +1002,27 @@ def remove_preterminal_POS(root):
         else:
             remove_preterminal_POS(c)
 
+def merge_depth(root, max_depth, cur_depth):
+    ''' raise up trees whose depth exceed max_depth '''
+    if cur_depth >= max_depth:
+        #root.label = u'*'
+        root.children = root.leaf_nodes()
+        return root
+    new_children = []
+    for i, c in enumerate(root.children):
+        if hasattr(c, 'children'):
+            c = merge_depth(c, max_depth, cur_depth+1)
+            # combine consecutive * nodes
+            if new_children and hasattr(new_children[-1], 'label') and new_children[-1].is_preterminal() and c.is_preterminal():
+                for x in c.children:
+                    new_children[-1].add_child(x)
+            else:
+                new_children.append(c)
+        else:
+            new_children.append(c)
+    root.children = new_children
+    return root
+
 # Tokenize a string.
 # Tokens yielded are of the form (type, string)
 # Possible values for 'type' are '(', ')' and 'WORD'
@@ -1121,16 +1146,17 @@ if __name__ == "__main__":
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-    '''
+
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
-        t.root = TreeNode(u'XXX', [t.root])
+        remove_preterminal_POS(t.root)
         #t.root = right_binarize(t.root)
-        
-        add_preterminal(t.root)
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
+        merge_depth(t.root, 5, 0)
+        add_preterminal_wordswitch(t.root)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
+        print t.to_parse_string().encode('utf-8')
     '''
     s = u"(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
@@ -1139,9 +1165,10 @@ if __name__ == "__main__":
     # 1. remove pos tag 2. split sentence piece, 3. right binarize 4. add x preterminal
     remove_preterminal_POS(tree.root)
     split_sent_piece(tree.root, sent_piece_segs(piece), 0)
-
+    merge_depth(tree.root, 3, 0)
     tree.root = add_preterminal_wordswitch(tree.root)
     #tree.root = right_binarize(tree.root)
+
     tree.reset_timestep()
     data = tree.get_data_root(rule_vocab, word_vocab)
     for d in data:
@@ -1156,7 +1183,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-
+    '''
 
 ###### Obsolete Functions
 

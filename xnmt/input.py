@@ -398,7 +398,7 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=-1):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=False):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
@@ -424,8 +424,8 @@ class TreeReader(BaseTextReader, Serializable):
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
                 split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
-                if self.merge > 0:
-                    merge_depth(tree.root, self.merge, 0)
+                if self.merge:
+                    merge_tags(tree.root)
                 # add x after bpe
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
@@ -442,8 +442,8 @@ class TreeReader(BaseTextReader, Serializable):
                 tree = Tree(parse_root(tokenize(line)))
                 if self.del_preterm_POS:
                     remove_preterminal_POS(tree.root)
-                if self.merge > 0:
-                    merge_depth(tree.root, self.merge, 0)
+                if self.merge:
+                    merge_tags(tree.root)
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
                     if self.binarize:
@@ -512,7 +512,10 @@ class TreeNode(object):
         self.frontir_label = None
 
     def is_preterminal(self):
-        return len(self.children) == 1 and (not hasattr(self.children[0], 'is_preterminal'))
+        #return len(self.children) == 1 and (not hasattr(self.children[0], 'is_preterminal'))
+        for c in self.children:
+            if hasattr(c, 'is_preterminal'): return False
+        return True
 
     def to_parse_string(self):
         c_str = []
@@ -708,34 +711,6 @@ class Tree(object):
 
         copied_tree.root = root
         return copied_tree
-
-    @classmethod
-    def from_rule_deriv_v1(cls, derivs):
-        tree = Tree()
-        stack_tree = [tree.root]
-        stack_children_left = [1]
-
-        for r in derivs:
-            p_tree, p_children_left = stack_tree.pop(), stack_children_left.pop()
-
-            new_tree = TreeNode(r.lhs, [child for child in r.rhs if not child in r.open_nonterms])
-            p_tree.add_child(new_tree, tree.id2n)
-            new_tree._parent = p_tree
-            p_children_left -= 1
-
-            if p_children_left > 0:
-                stack_tree.append(p_tree)
-                stack_children_left.append(p_children_left)
-
-            if len(r.open_nonterms) > 0:
-                stack_tree.append(new_tree)
-                stack_children_left.append(len(r.open_nonterms))
-        # if there is no available translation, the rules on deriv stack won't be consumed up
-        # assert len(stack_children_left) == len(stack_tree) == 0
-        # if len(stack_children_left) != 0 or len(stack_tree) != 0:
-        # for d in derivs:
-        #   print str(d)
-        return tree
 
     @classmethod
     def from_rule_deriv(cls, derivs):
@@ -976,6 +951,9 @@ def add_preterminal_wordswitch(root):
     '''
     preterm_paren = None
     new_children = []
+    if root.label == u'*':
+        root.add_child(Vocab.ES_STR)
+        return root
     for i, c in enumerate(root.children):
         if type(c) == str or type(c) == unicode:
             if not preterm_paren:
@@ -1012,6 +990,29 @@ def merge_depth(root, max_depth, cur_depth):
     for i, c in enumerate(root.children):
         if hasattr(c, 'children'):
             c = merge_depth(c, max_depth, cur_depth+1)
+            # combine consecutive * nodes
+            if new_children and hasattr(new_children[-1], 'label') and new_children[-1].is_preterminal() and c.is_preterminal():
+                for x in c.children:
+                    new_children[-1].add_child(x)
+            else:
+                new_children.append(c)
+        else:
+            new_children.append(c)
+    root.children = new_children
+    return root
+
+def merge_tags(root):
+    ''' raise up trees whose label is in a given set '''
+    kept_label = set([u'np', u'vp', u'pp', u's', u'root', u'sbar', u'frag', u'sinv' u'in', u'XXX', u'prn'
+                      u'NP', u'VP', u'PP',u'S', u'ROOT', u'SBAR', u'FRAG', u'SINV' u'IN', u'PRN'])
+    if not root.label in kept_label:
+        root.label = u'*'
+        root.children = root.leaf_nodes()
+        return root
+    new_children = []
+    for i, c in enumerate(root.children):
+        if hasattr(c, 'children'):
+            c = merge_tags(c)
             # combine consecutive * nodes
             if new_children and hasattr(new_children[-1], 'label') and new_children[-1].is_preterminal() and c.is_preterminal():
                 for x in c.children:
@@ -1152,33 +1153,35 @@ if __name__ == "__main__":
         remove_preterminal_POS(t.root)
         #t.root = right_binarize(t.root)
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
-        merge_depth(t.root, 5, 0)
+        #merge_depth(t.root, 5, 0)
+        merge_tags(t.root)
         add_preterminal_wordswitch(t.root)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
         print t.to_parse_string().encode('utf-8')
     '''
-    s = u"(ROOT (S (NP (FW i)) (VP (VBP like) (NP (PRP$ my) (NN steak) (NN medium))) (. .)) )"
+    s = u"(root (s (np (fw i)) (vp (vbp like) (np (prp$ my) (nn steak) (nn medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
     #s = u"(ROOT (S (NP (FW i)) (VP (VBD heard) (SBAR (IN that) (S (NP (PRP he)) (VP (VBD gave) (NP (PRP himself)) (PRT (RP up)) (PP (TO to) (NP (DT the) (NN police))))))) (. .)) )"
     tree = Tree(parse_root(tokenize(s)))
     # 1. remove pos tag 2. split sentence piece, 3. right binarize 4. add x preterminal
     remove_preterminal_POS(tree.root)
     split_sent_piece(tree.root, sent_piece_segs(piece), 0)
-    merge_depth(tree.root, 3, 0)
+    #merge_depth(tree.root, 3, 0)
+    merge_tags(tree.root)
     tree.root = add_preterminal_wordswitch(tree.root)
     #tree.root = right_binarize(tree.root)
-
+    
     tree.reset_timestep()
     data = tree.get_data_root(rule_vocab, word_vocab)
-    for d in data:
-        print d
-        if d[3] == 0:
-            print rule_vocab[d[0]]
-        else:
-            print word_vocab[d[0]]
-    print tree.to_parse_string()
-    print tree.to_string()
+    #for d in data:
+    #    print d
+    #    if d[3] == 0:
+    #        print rule_vocab[d[0]]
+    #    else:
+    #        print word_vocab[d[0]]
+    print tree.to_parse_string().encode('utf-8')
+    print tree.to_string().encode('utf-8')
     #idx_list = rule_vocab.rule_index_with_lhs('*')
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]

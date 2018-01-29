@@ -239,7 +239,10 @@ class XnmtTrainer(object):
       dy.renew_cg()
       loss_builder = LossBuilder()
       #print(src)
-      standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
+      if hasattr(self.corpus_parser.trg_reader, 'word_vocab'):
+        standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
+      else:
+        standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab)
       #print(src)
       if standard_loss.__class__ == LossBuilder:
         loss = None

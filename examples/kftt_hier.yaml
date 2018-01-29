@@ -8,11 +8,10 @@ defaults:
     run_for_epochs: 30
     eval_metrics: bleu
   train:
-    pretrained_model_file: kftt/output/kftt-tree-nobina-nopos.mod
     batcher: !SrcBatcher
       batch_size: 16
-    dev_every: 50000
-    dropout: 0.1
+    #dev_every: 50000
+    dropout: 0.0
     default_layer_dim: 512
     restart_trainer: False
     trainer: Adam
@@ -22,9 +21,9 @@ defaults:
     dev_metrics: bleu
     schedule_metric: bleu
     training_corpus: !BilingualTrainingCorpus
-      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.ja
-      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.en
-      train_len_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.en
+      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train-0.2.lowpiece.ja
+      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train-0.2.lowparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train-0.2.lowpiece.en
+      train_len_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train-0.2.lowpiece.en
       dev_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.ja
       dev_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.en
       dev_ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lower.en
@@ -34,42 +33,45 @@ defaults:
       trg_reader: !TreeReader 
         binarize: False
         del_preterm_POS: True
+        read_word: True
+        merge: False
     model: !DefaultTranslator
       loop_trg: True
       src_embedder: !SimpleWordEmbedder {}
       trg_embedder: !SimpleWordEmbedder {}
+      word_embedder: !SimpleWordEmbedder {}
       encoder: !LSTMSeqTransducer
         layers: 1
       attender: !StandardAttender {}
-      decoder: !TreeDecoder
+      word_attender: !StandardAttender {}
+      decoder: !TreeHierDecoder
         layers: 1
         mlp_hidden_dim: 512
         bridge: !CopyBridge {}
-        word_state_feeding: True
-        word_lstm: False
         start_nonterm: root
-        frontir_feeding: False
   decode:
     beam: 5
     post_process: rule-piece
-    max_len: 300
+    max_len: 200
     len_norm_type: !PolynomialNormalization
       apply_during_search: true
     src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lowpiece.ja
   evaluate:
     ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lower.en
 
-kftt-tree-nobina-nopos-addnorm-beam12:
-  experiment:
-    eval_only: True
-  train:
-    pretrained_model_file: kftt/output/kftt-tree-nobina-nopos.mod
+#kftt-tree-hier-2:
+#  train:
+#    pretrained_model_file: kftt/output/kftt-tree-hier.mod
+
+kftt-tree-hier-0.2-nodrop:
+  #train:
+  #  pretrained_model_file: kftt/output/kftt-tree-hier-0.5.mod
   decode:
-    beam: 10
     max_len: 200
-    len_norm_type: !AdditiveNormalization
-      penalty: -0.1
+    len_norm_type: !PolynomialNormalization
       apply_during_search: True
+      m: 2.
+    beam: 6
     src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.ja
   evaluate:
     ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lower.en

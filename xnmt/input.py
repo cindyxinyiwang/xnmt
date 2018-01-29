@@ -398,13 +398,14 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=False):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=False, merge_level=-1):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
         self.word_vocab = word_vocab
         self.read_word = read_word
         self.merge = merge
+        self.merge_level = merge_level
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -426,6 +427,8 @@ class TreeReader(BaseTextReader, Serializable):
                 split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
                 if self.merge:
                     merge_tags(tree.root)
+                if self.merge_level > 0:
+                    merge_depth(tree.root, self.merge_level, 0)
                 # add x after bpe
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
@@ -444,6 +447,8 @@ class TreeReader(BaseTextReader, Serializable):
                     remove_preterminal_POS(tree.root)
                 if self.merge:
                     merge_tags(tree.root)
+                if self.merge_level:
+                    merge_depth(tree.root, self.merge_level, 0)
                 if self.word_vocab:
                     add_preterminal_wordswitch(tree.root)
                     if self.binarize:

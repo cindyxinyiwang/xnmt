@@ -546,18 +546,17 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         # word rnn
         word_idx = trg.get_col(0)
         # if this is end of phrase append states list
+                  #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
+        inp = word_embedder.embed(word_idx)
+        if self.input_feeding:
+          inp = dy.concatenate([inp, tree_dec_state.word_context])
+        inp = dy.concatenate([inp, paren_tm1_state])
+        word_rnn_state = word_rnn_state.add_input(inp)
+        # update rule RNN
+        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
+                                                        word_rnn_state.output()]))
         if word_idx[0] == Vocab.ES:
           states = np.append(states, rnn_state.output())
-        else:
-          #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
-          inp = word_embedder.embed(word_idx)
-          if self.input_feeding:
-            inp = dy.concatenate([inp, tree_dec_state.word_context])
-          inp = dy.concatenate([inp, paren_tm1_state])
-          word_rnn_state = word_rnn_state.add_input(inp)
-          # update rule RNN
-          rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
-                                                          word_rnn_state.output()]))
 
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
@@ -566,16 +565,15 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       open_nonterms = tree_dec_state.open_nonterms[:]
       prev_word_state = tree_dec_state.prev_word_state
       if open_nonterms[-1].label == u'*':
+        inp = word_embedder.embed(trg)
+        if self.input_feeding:
+          inp = dy.concatenate([inp, tree_dec_state.word_context])
+        inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
+        word_rnn_state = word_rnn_state.add_input(inp)
+        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                                        word_rnn_state.output()]))
         if trg == Vocab.ES:
           open_nonterms.pop()
-        else:
-          inp = word_embedder.embed(trg)
-          if self.input_feeding:
-            inp = dy.concatenate([inp, tree_dec_state.word_context])
-          inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
-          word_rnn_state = word_rnn_state.add_input(inp)
-          rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                                          word_rnn_state.output()]))
       else:
         inp = rule_embedder.embed(trg)
         if self.input_feeding:

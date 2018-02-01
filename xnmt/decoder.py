@@ -460,10 +460,10 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                               model = param_col,
                                               residual_to_output = residual_to_output)
     # MLP
-    self.rule_context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
+    self.rule_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
-    self.word_context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
+    self.word_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
     self.rule_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
@@ -545,18 +545,20 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       else:
         # word rnn
         word_idx = trg.get_col(0)
-        #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
-        inp = word_embedder.embed(word_idx)
-        if self.input_feeding:
-          inp = dy.concatenate([inp, tree_dec_state.word_context])
-        inp = dy.concatenate([inp, paren_tm1_state])
-        word_rnn_state = word_rnn_state.add_input(inp)
-        # update rule RNN
-        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
-                                                        word_rnn_state.output()]))
         # if this is end of phrase append states list
         if word_idx[0] == Vocab.ES:
           states = np.append(states, rnn_state.output())
+        else:
+          #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
+          inp = word_embedder.embed(word_idx)
+          if self.input_feeding:
+            inp = dy.concatenate([inp, tree_dec_state.word_context])
+          inp = dy.concatenate([inp, paren_tm1_state])
+          word_rnn_state = word_rnn_state.add_input(inp)
+          # update rule RNN
+          rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
+                                                          word_rnn_state.output()]))
+
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
     else:
@@ -564,15 +566,16 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       open_nonterms = tree_dec_state.open_nonterms[:]
       prev_word_state = tree_dec_state.prev_word_state
       if open_nonterms[-1].label == u'*':
-        inp = word_embedder.embed(trg)
-        if self.input_feeding:
-          inp = dy.concatenate([inp, tree_dec_state.word_context])
-        inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
-        word_rnn_state = word_rnn_state.add_input(inp)
-        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                                        word_rnn_state.output()]))
         if trg == Vocab.ES:
           open_nonterms.pop()
+        else:
+          inp = word_embedder.embed(trg)
+          if self.input_feeding:
+            inp = dy.concatenate([inp, tree_dec_state.word_context])
+          inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
+          word_rnn_state = word_rnn_state.add_input(inp)
+          rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                                          word_rnn_state.output()]))
       else:
         inp = rule_embedder.embed(trg)
         if self.input_feeding:
@@ -609,10 +612,12 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     :returns: Scores over the vocabulary given this state.
     """
     if is_terminal:
-      h_t = dy.tanh(self.word_context_projector(dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])))
+      h_t = dy.tanh(self.word_context_projector(dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
+                                                                tree_dec_state.rnn_state.output(), tree_dec_state.context])))
       return self.word_vocab_projector(h_t), -1
     else:
-      h_t = dy.tanh(self.rule_context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
+      h_t = dy.tanh(self.rule_context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
+                                                                tree_dec_state.word_rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:
       # training
       return self.rule_vocab_projector(h_t), -1

@@ -437,8 +437,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
 
     # parent state + wordRNN output
     rule_lstm_input += lstm_dim*2
-    # ruleRNN output
-    word_lstm_input += lstm_dim
+    # ruleRNN output + ruleRNN update
+    word_lstm_input += lstm_dim*2
 
     self.rule_lstm_input = rule_lstm_input
     self.word_lstm_input = word_lstm_input
@@ -541,8 +541,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         rnn_state = rnn_state.add_input(inp)
         states = np.append(states, rnn_state.output())
 
-        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input-self.lstm_dim),
-        #                                                          rnn_state.output()]))
+        word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input-self.lstm_dim),
+                                                                  rnn_state.output()]))
       else:
         # word rnn
         word_idx = trg.get_col(0)
@@ -554,7 +554,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         inp = word_embedder.embed(word_idx)
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
-        inp = dy.concatenate([inp, paren_tm1_state])
+        inp = dy.concatenate([inp, paren_tm1_state, dy.zeros(self.lstm_dim)])
         word_rnn_state = word_rnn_state.add_input(inp)
         # update rule RNN
         rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
@@ -577,7 +577,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
           prev_word_emb = inp
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
-        inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
+        inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state, dy.zeros(self.lstm_dim)])
         word_rnn_state = word_rnn_state.add_input(inp)
         rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                                         word_rnn_state.output()]))
@@ -607,8 +607,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         new_open_nonterms.reverse()
         open_nonterms.extend(new_open_nonterms)
 
-        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
-        #                                                          rnn_state.output()]))
+        word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
+                                                                  rnn_state.output()]))
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state, prev_word_emb=prev_word_emb)
 

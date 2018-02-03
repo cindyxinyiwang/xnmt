@@ -801,6 +801,7 @@ class Tree(object):
 
     def get_data_root(self, rule_vocab, word_vocab=None):
         data = []
+        last_word_idx = Vocab.ES
         for t in xrange(1, len(self.t2n)):
             node = self.t2n[t]
             children, open_nonterms = [], []
@@ -814,8 +815,15 @@ class Tree(object):
             is_terminal = 1 if len(open_nonterms) == 0 else 0
             if word_vocab and is_terminal:
                 for c in node.children:
-                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal]
+                    #d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal]
+                    d = [word_vocab.convert(c), paren_t, last_word_idx, is_terminal]
                     data.append(d)
+                    if d[0] != Vocab.ES:
+                        last_word_idx = d[0]
+                #eos = node.children[-1]
+                #assert eos == Vocab.ES_STR
+                #d = [word_vocab.convert(eos), paren_t, data[-1][0], is_terminal]
+                #data.append(d)
             else:
                 d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
                     node.last_word_t, is_terminal,
@@ -957,6 +965,8 @@ def add_preterminal_wordswitch(root):
     preterm_paren = None
     new_children = []
     if root.label == u'*':
+        #lastword = root.children[-1]
+        #root.add_child(Vocab.ES_STR + u" " + lastword)
         root.add_child(Vocab.ES_STR)
         return root
     for i, c in enumerate(root.children):
@@ -968,11 +978,15 @@ def add_preterminal_wordswitch(root):
             preterm_paren.add_child(c)
         else:
             if preterm_paren:
+                #lastword = preterm_paren.children[-1]
+                #preterm_paren.add_child(Vocab.ES_STR + u" " + lastword)
                 preterm_paren.add_child(Vocab.ES_STR)
             c = add_preterminal_wordswitch(c)
             new_children.append(c)
             preterm_paren = None
     if preterm_paren:
+        #lastword = preterm_paren.children[-1]
+        #preterm_paren.add_child(Vocab.ES_STR + u" " + lastword)
         preterm_paren.add_child(Vocab.ES_STR)
     root.children = new_children
     return root
@@ -1152,7 +1166,7 @@ if __name__ == "__main__":
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-
+    '''
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
@@ -1179,19 +1193,19 @@ if __name__ == "__main__":
     
     tree.reset_timestep()
     data = tree.get_data_root(rule_vocab, word_vocab)
-    #for d in data:
-    #    print d
-    #    if d[3] == 0:
-    #        print rule_vocab[d[0]]
-    #    else:
-    #        print word_vocab[d[0]]
+    for d in data:
+        print d
+        if d[3] == 0:
+            print rule_vocab[d[0]]
+        else:
+            print word_vocab[d[0]]
     print tree.to_parse_string().encode('utf-8')
     print tree.to_string().encode('utf-8')
     #idx_list = rule_vocab.rule_index_with_lhs('*')
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-    '''
+
 
 ###### Obsolete Functions
 

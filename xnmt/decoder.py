@@ -146,7 +146,7 @@ class OpenNonterm:
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
   def __init__(self, rnn_state=None, word_rnn_state=None, context=None, word_context=None,
-               states=[], tree=None, open_nonterms=[], prev_word_state=None):
+               states=[], tree=None, open_nonterms=[], prev_word_state=None, prev_word_emb=None):
     self.rnn_state = rnn_state
     self.context = context
     self.word_rnn_state = word_rnn_state
@@ -158,13 +158,14 @@ class TreeDecoderState:
     #used at decoding time
     self.open_nonterms = open_nonterms
     self.prev_word_state = prev_word_state
+    self.prev_word_emb = prev_word_emb
 
   def copy(self):
     open_nonterms_copy = []
     for n in self.open_nonterms:
       open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state, n.is_sibling, n.sib_state))
     return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
-                            open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state)
+                            open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state, prev_word_emb=self.prev_word_emb)
 
 class TreeDecoder(RnnDecoder, Serializable):
   # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
@@ -502,7 +503,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       zeros_lstm = dy.zeros(self.lstm_dim)
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
           open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
-          prev_word_state=zeros_lstm)
+          prev_word_state=zeros_lstm, prev_word_emb=dy.zeros(self.trg_embed_dim))
     else:
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \
@@ -545,8 +546,11 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       else:
         # word rnn
         word_idx = trg.get_col(0)
+        eos = word_idx[0] == Vocab.ES
         # if this is end of phrase append states list
                   #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
+        if word_idx[0] == Vocab.ES:
+          word_idx = trg.get_col(2) # if it is EOS, we feed in the word before EOS
         inp = word_embedder.embed(word_idx)
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
@@ -555,7 +559,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         # update rule RNN
         rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
                                                         word_rnn_state.output()]))
-        if word_idx[0] == Vocab.ES:
+        if eos:
           states = np.append(states, rnn_state.output())
 
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
@@ -564,8 +568,13 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       #print trg
       open_nonterms = tree_dec_state.open_nonterms[:]
       prev_word_state = tree_dec_state.prev_word_state
+      prev_word_emb = tree_dec_state.prev_word_emb
       if open_nonterms[-1].label == u'*':
-        inp = word_embedder.embed(trg)
+        if trg == Vocab.ES:
+          inp = prev_word_emb
+        else:
+          inp = word_embedder.embed(trg)
+          prev_word_emb = inp
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
         inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
@@ -601,7 +610,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
         #                                                          rnn_state.output()]))
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
-                              open_nonterms=open_nonterms, prev_word_state=prev_word_state)
+                              open_nonterms=open_nonterms, prev_word_state=prev_word_state, prev_word_emb=prev_word_emb)
 
   def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1):
     """Get scores given a current state.

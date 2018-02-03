@@ -461,10 +461,10 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                               model = param_col,
                                               residual_to_output = residual_to_output)
     # MLP
-    self.rule_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+    self.rule_context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
-    self.word_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+    self.word_context_projector = xnmt.linear.Linear(input_dim=input_dim + lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
     self.rule_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
@@ -619,12 +619,10 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     :returns: Scores over the vocabulary given this state.
     """
     if is_terminal:
-      h_t = dy.tanh(self.word_context_projector(dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
-                                                                tree_dec_state.rnn_state.output(), tree_dec_state.context])))
+      h_t = dy.tanh(self.word_context_projector(dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])))
       return self.word_vocab_projector(h_t), -1
     else:
-      h_t = dy.tanh(self.rule_context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
-                                                                tree_dec_state.word_rnn_state.output(), tree_dec_state.context])))
+      h_t = dy.tanh(self.rule_context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])))
     if label_idx >= 0:
       # training
       return self.rule_vocab_projector(h_t), -1

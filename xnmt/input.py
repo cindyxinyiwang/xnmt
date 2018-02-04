@@ -398,7 +398,8 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=False, merge_level=-1):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False,
+                 read_word=False, merge=False, merge_level=-1, preprocessed_tree=False):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
@@ -406,6 +407,7 @@ class TreeReader(BaseTextReader, Serializable):
         self.read_word = read_word
         self.merge = merge
         self.merge_level = merge_level
+        self.preprocessed_tree = preprocessed_tree
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -419,6 +421,14 @@ class TreeReader(BaseTextReader, Serializable):
         if self.read_word and self.word_vocab is None:
             self.word_vocab = Vocab()
         filename = filename.split(',')
+        if self.preprocessed_tree:
+            assert len(file) == 1
+            for line in self.iterate_filtered(filename[0], filter_ids):
+                tree = Tree(parse_root(tokenize(line)))
+                tree.reset_timestep()
+                yield TreeInput(tree.get_data_root(self.vocab, self.word_vocab))
+            return
+
         if len(filename) > 1:
             for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
                 tree = Tree(parse_root(tokenize(line)))
@@ -528,14 +538,14 @@ class TreeNode(object):
         while stack:
             cur = stack.pop()
             while not hasattr(cur, 'label'):
-                c_str.append(cur)
+                c_str.append(u' '+cur)
                 if not stack: break
                 cur = stack.pop()
             if not hasattr(cur, 'children'): break
             stack.append(u')')
             for c in reversed(cur.children):
                 stack.append(c)
-            stack.append(u'({} '.format(cur.label) )
+            stack.append(u'({}'.format(cur.label) )
         return u"".join(c_str)
 
     def to_string(self, piece=True):
@@ -957,6 +967,29 @@ def add_preterminal(root):
         else:
             add_preterminal(c)
 
+def combine_preterminal_wordswitch(root):
+    ''' Combine consecutive word switch  '''
+    last_preterm = None
+    new_children = []
+    if root.label == u'*':
+        return root
+    for i, c in enumerate(root.children):
+        if c.label == u'*':
+            if not last_preterm:
+                last_preterm = c
+            else:
+                last_preterm.children = last_preterm.children[:-1] + c.children
+        else:
+            if last_preterm:
+                new_children.append(last_preterm)
+                last_preterm = None
+            c = combine_preterminal_wordswitch(c)
+            new_children.append(c)
+    if last_preterm:
+        new_children.append(last_preterm)
+    root.children = new_children
+    return root
+
 def add_preterminal_wordswitch(root):
     ''' Add preterminal X before each terminal symbol '''
     ''' word_switch: one * symbol for each phrase chunk
@@ -1160,21 +1193,20 @@ if __name__ == "__main__":
     '''
 
 
-    train_parse = "kftt_data/tok/kyoto-train.lowparse.en"
-    train_piece = "kftt_data/tok/kyoto-train.lowpiece.en"
+    train_parse = "orm_data/set0-trainunfilt.tok.parse.eng"
+    train_piece = "orm_data/set0-trainunfilt.tok.piece.eng"
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-    '''
+
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
         #t.root = right_binarize(t.root)
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
-        #merge_depth(t.root, 5, 0)
-        merge_tags(t.root)
-        add_preterminal_wordswitch(t.root)
+        merge_depth(t.root, 3, 0)
+        #qmerge_tags(t.root)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
         print t.to_parse_string().encode('utf-8')
@@ -1205,7 +1237,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-
+    '''
 
 ###### Obsolete Functions
 

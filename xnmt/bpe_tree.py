@@ -88,8 +88,8 @@ def collect(treenode, rule_vocab, count_dict, conn_dict):
                 continue  # continue if c is terminal string
             if not c.is_preterminal():
                 visited.append(c)
-            c_rule_id = rule_vocab.convert(get_rule(c))
-            count_dict[(cur_rule_id, c_rule_id)] += 1
+                c_rule_id = rule_vocab.convert(get_rule(c))
+                count_dict[(cur_rule_id, c_rule_id)] += 1
 
 def replace(treenode, par_rule, child_rule, label):
     init = []
@@ -185,11 +185,19 @@ if __name__ == "__main__":
     if args.piece_file:
         piece_fp = codecs.open(args.piece_file, 'r', encoding='utf-8')
     for line in tree_fp:
+        #if args.piece_file:
+        #    piece = piece_fp.readline()
+        #    t = Tree(parse_root(tokenize(line)), sent_piece=piece, binarize=args.binarize)
+        #else:
+        #    t = Tree(parse_root(tokenize(line)), binarize=args.binarize)
+        t = Tree(parse_root(tokenize(line)))
+        remove_preterminal_POS(t.root)
+        if args.binarize:
+          t.root = right_binarize(t.root)
         if args.piece_file:
-            piece = piece_fp.readline()
-            t = Tree(parse_root(tokenize(line)), sent_piece=piece, binarize=args.binarize)
-        else:
-            t = Tree(parse_root(tokenize(line)), binarize=args.binarize)
+          piece = piece_fp.readline()
+          split_sent_piece(t.root, sent_piece_segs(piece), 0)
+        add_preterminal_wordswitch(t.root)
         tree_list.append(t.root.children[0])   # Tree adds an extra xxx node as parent to each root node
     #for t in tree_list:
     #    print t.to_parse_string()
@@ -207,7 +215,8 @@ if __name__ == "__main__":
             label += 1
     else:
         BPE(tree_list, max_iter=args.max_iter, root=args.root)
-
+    for t in tree_list:
+      combine_preterminal_wordswitch(t)
     with codecs.open(args.out_file, encoding='utf-8', mode='w') as out:
         for t in tree_list:
             out.write(u'{}\n'.format(t.to_parse_string()))

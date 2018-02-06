@@ -192,8 +192,11 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       if self.word_attender:
         self.word_attender.init_sent(encodings)
       ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-      if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+      if isinstance(self.decoder, TreeDecoder):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
+      elif isinstance(self.decoder, TreeHierDecoder):
+        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True,
+                                               init_prev_emb=self.word_embedder.embed(Vocab.SS))
       else:
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
       output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents),

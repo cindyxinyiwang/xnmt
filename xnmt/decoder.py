@@ -481,7 +481,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     return [set(["layers", "bridge.dec_layers"]),
             set(["lstm_dim", "bridge.dec_dim"])]
 
-  def initial_state(self, enc_final_states, ss_expr, decoding=False):
+  def initial_state(self, enc_final_states, ss_expr, decoding=False, init_prev_emb=None):
     """Get the initial state of the decoder given the encoder final states.
 
     :param enc_final_states: The encoder final states.
@@ -504,7 +504,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       zeros_lstm = dy.zeros(self.lstm_dim)
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
           open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
-          prev_word_state=zeros_lstm, prev_word_emb=dy.zeros(self.trg_embed_dim))
+          prev_word_state=zeros_lstm, prev_word_emb=init_prev_emb)
     else:
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \

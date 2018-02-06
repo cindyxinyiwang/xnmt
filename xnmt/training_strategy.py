@@ -55,7 +55,7 @@ class TrainingMLELoss(Serializable):
           if translator.word_embedder:
             if ref_word.get_col(3)[0] and ref_word.get_col(4)[0]: # is first word
               dec_state = translator.decoder.init_wordRNN(dec_state,
-                                                          prev_word_emb=translator.word_embedder.embed(Vocab.ES),
+                                                          prev_word_emb=translator.word_embedder.embed(ref_word.get_col(2)),
                                                           paren_t=ref_word.get_col(1))
           if translator.decoder.set_word_lstm:
             dec_state.word_context = translator.word_attender.calc_context(dec_state.word_rnn_state.output(), pick_src_elem)

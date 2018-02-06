@@ -238,6 +238,7 @@ class XnmtTrainer(object):
       # Loss calculation
       dy.renew_cg()
       loss_builder = LossBuilder()
+      #term_loss_builder = LossBuilder()
       #print(src)
       if hasattr(self.corpus_parser.trg_reader, 'word_vocab'):
         standard_loss, terminal_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
@@ -257,11 +258,11 @@ class XnmtTrainer(object):
       additional_loss = self.model.calc_additional_loss(dy.nobackprop(-standard_loss))
       if additional_loss != None:
         loss_builder.add_loss("additional_loss", additional_loss)
-      loss_builder.add_loss("terminal_loss", terminal_loss)
 
       # Log the loss sum
       #print(standard_loss.dim())
       loss_value = loss_builder.compute()
+      #term_loss_value = term_loss_builder.compute()
       if self.training_corpus.train_len_file:
         self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
       else:
@@ -272,7 +273,8 @@ class XnmtTrainer(object):
       
       # Devel reporting
       self.logger.report_train_process()
-      #print(loss_value.dim())
+      #print("terminal loss", term_loss_value.value() / sum(self.train_trg_len[batch_num]))
+
       if self.logger.should_report_dev():
         self.dev_evaluation()
 
@@ -358,19 +360,22 @@ class XnmtTrainer(object):
 
   def compute_dev_loss(self):
     loss_builder = LossBuilder()
+    term_loss_builder = LossBuilder()
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
       dy.renew_cg()
       standard_loss, terminal_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
-      loss_builder.add_loss("terminal_loss", terminal_loss)
-      epoch_words = 0
+      term_loss_builder.add_loss("terminal loss", terminal_loss)
+      #epoch_words = 0
       if self.training_corpus.dev_len_file:
         epoch_words = sum(self.dev_trg_len[i])
       else:
         epoch_words = self.logger.count_trg_words(self.dev_trg[i])
       trg_words_cnt += epoch_words
       loss_builder.compute()
+      term_loss_builder.compute()
+    print("term loss ", term_loss_builder.sum() / trg_words_cnt)
       #print(epoch_words)
     #print("total %d" % trg_words_cnt)
     return trg_words_cnt, LossScore(loss_builder.sum() / trg_words_cnt)

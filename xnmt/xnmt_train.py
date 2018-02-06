@@ -240,9 +240,9 @@ class XnmtTrainer(object):
       loss_builder = LossBuilder()
       #print(src)
       if hasattr(self.corpus_parser.trg_reader, 'word_vocab'):
-        standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
+        standard_loss, terminal_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
       else:
-        standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab)
+        standard_loss, terminal_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab)
       #print(src)
       if standard_loss.__class__ == LossBuilder:
         loss = None
@@ -257,6 +257,7 @@ class XnmtTrainer(object):
       additional_loss = self.model.calc_additional_loss(dy.nobackprop(-standard_loss))
       if additional_loss != None:
         loss_builder.add_loss("additional_loss", additional_loss)
+      loss_builder.add_loss("terminal_loss", terminal_loss)
 
       # Log the loss sum
       #print(standard_loss.dim())
@@ -360,8 +361,9 @@ class XnmtTrainer(object):
     trg_words_cnt = 0
     for i in range(len(self.dev_src)):
       dy.renew_cg()
-      standard_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
+      standard_loss, terminal_loss = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
       loss_builder.add_loss("loss", standard_loss)
+      loss_builder.add_loss("terminal_loss", terminal_loss)
       epoch_words = 0
       if self.training_corpus.dev_len_file:
         epoch_words = sum(self.dev_trg_len[i])

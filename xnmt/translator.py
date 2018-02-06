@@ -137,7 +137,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     # Initialize the hidden state from the encoder
     if self.loop_trg:
       loss = []
-      
+      terminal_loss = []
       ss = mark_as_batch([Vocab.SS])
       emb_ss = self.trg_embedder.embed(ss)
       #self.start_sent()
@@ -158,12 +158,13 @@ class DefaultTranslator(Translator, Serializable, Reportable):
           single_trg = mark_as_batch([trg[i]])
         #dec_state = self.decoder.initial_state([final_state.pick_batch_elem(i) for final_state in enc_final_state], emb_ss)
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), emb_ss)
-        #loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg, pick_src_elem=i, trg_rule_vocab=trg_rule_vocab))
-        loss.append(self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg,
-                                         trg_rule_vocab=trg_rule_vocab, word_vocab=word_vocab))
+        l, tl = self.loss_calculator(self, dec_state, mark_as_batch(src[i]), single_trg,
+                                         trg_rule_vocab=trg_rule_vocab, word_vocab=word_vocab)
+        loss.append(l)
+        terminal_loss.append(tl)
         #dy.print_text_graphviz()
         #exit(0)
-      return dy.esum(loss)
+      return dy.esum(loss), dy.esum(terminal_loss)
     else:
       self.start_sent()
       embeddings = self.src_embedder.embed_sent(src)

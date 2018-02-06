@@ -615,7 +615,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state, prev_word_emb=prev_word_emb)
 
-  def init_wordRNN(self, tree_dec_state, prev_word_emb=None, paren_emb=None):
+  def init_wordRNN(self, tree_dec_state, prev_word_emb=None, paren_t=None):
     word_rnn_state = tree_dec_state.word_rnn_state
     rnn_state = tree_dec_state.rnn_state
     if self.decoding:
@@ -629,7 +629,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       inp = prev_word_emb
       if self.input_feeding:
         inp = dy.concatenate([inp, tree_dec_state.word_context])
-      inp = dy.concatenate([inp, paren_emb])
+      inp = dy.concatenate([inp, tree_dec_state.states[paren_t][0]])
       word_rnn_state = word_rnn_state.add_input(inp)
     rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                                     word_rnn_state.output()]))
@@ -669,10 +669,10 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     scores, valid_y_len = self.get_scores(tree_dec_state, trg_rule_vocab, is_terminal, 1)
     # single mode
     if not xnmt.batcher.is_batched(ref_action):
-      return dy.pickneglogsoftmax(scores, ref_word)
+      return dy.pickneglogsoftmax(scores, ref_word), is_terminal
     # minibatch mode
     else:
-      return dy.pickneglogsoftmax_batch(scores, ref_word)
+      return dy.pickneglogsoftmax_batch(scores, ref_word), is_terminal
 
   def set_train(self, val):
     self.fwd_lstm.set_dropout(self.dropout if val else 0.0)

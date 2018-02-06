@@ -811,7 +811,7 @@ class Tree(object):
 
     def get_data_root(self, rule_vocab, word_vocab=None):
         data = []
-        last_word_idx = Vocab.ES
+        last_word_idx = Vocab.SS
         for t in xrange(1, len(self.t2n)):
             node = self.t2n[t]
             children, open_nonterms = [], []
@@ -841,7 +841,7 @@ class Tree(object):
                 #data.append(d)
             else:
                 d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
-                    node.last_word_t, is_terminal,
+                    last_word_idx, is_terminal,
                     rule_vocab.tag_vocab.convert(node.frontir_label), rule_vocab.tag_vocab.convert(node.label)]
                 data.append(d)
         return data
@@ -1204,7 +1204,7 @@ if __name__ == "__main__":
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-
+    '''
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
@@ -1242,7 +1242,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-    '''
+
 
 ###### Obsolete Functions
 

@@ -108,9 +108,9 @@ class BeamSearch(SearchStrategy):
             dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
           if word_embedder:
-            if len(hyp.id_list) > 0:
-              if (not hyp.id_list[-1][1]) and dec_state.open_nonterms[-1].label == u'*': # if currently looking for the first word
-                dec_state = decoder.init_wordRNN(dec_state)
+            #if len(hyp.id_list) > 0:
+            #  if (not hyp.id_list[-1][1]) and dec_state.open_nonterms[-1].label == u'*': # if currently looking for the first word
+            #    dec_state = decoder.init_wordRNN(dec_state)
             score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab, is_terminal=dec_state.open_nonterms[-1].label == u'*')
           else:
             score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)

@@ -196,7 +196,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
       elif isinstance(self.decoder, TreeHierDecoder):
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True,
-                                               init_prev_emb=self.word_embedder.embed(Vocab.SS))
+                                               init_prev_emb=self.word_embedder.embed(Vocab.ES))
       else:
         dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
       output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents),

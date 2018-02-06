@@ -824,9 +824,14 @@ class Tree(object):
             paren_t = 0 if not node.parent() else node.parent().timestep
             is_terminal = 1 if len(open_nonterms) == 0 else 0
             if word_vocab and is_terminal:
+                is_first = True
                 for c in node.children:
-                    #d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal]
-                    d = [word_vocab.convert(c), paren_t, last_word_idx, is_terminal]
+                    #d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, is_first_word]
+                    if is_first:
+                        d = [word_vocab.convert(c), paren_t, last_word_idx, is_terminal, True]
+                    else:
+                        d = [word_vocab.convert(c), paren_t, last_word_idx, is_terminal, False]
+                    is_first = False
                     data.append(d)
                     if d[0] != Vocab.ES:
                         last_word_idx = d[0]

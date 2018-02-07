@@ -411,12 +411,13 @@ class TreeHierDecoder(RnnDecoder, Serializable):
   def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, start_nonterm='ROOT'):
+               bridge=None, start_nonterm='ROOT', feed_word_emb=False):
 
     register_handler(self)
     self.set_word_lstm = True
     param_col = yaml_context.dynet_param_collection.param_col
     self.start_nonterm = start_nonterm
+    self.feed_word_emb = feed_word_emb
     # Define dim
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
@@ -436,6 +437,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
 
     # parent state + wordRNN output
     rule_lstm_input += lstm_dim*2
+    if self.feed_word_emb:
+      rule_lstm_input += trg_embed_dim
     # ruleRNN output
     word_lstm_input += lstm_dim
 
@@ -537,6 +540,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.context])
         inp = dy.concatenate([inp, paren_tm1_state, word_rnn_state.output()])
+        if self.feed_word_emb:
+          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
         rnn_state = rnn_state.add_input(inp)
         states = np.append(states, rnn_state.output())
 
@@ -548,13 +553,17 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         # if this is end of phrase append states list
         #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
         inp = word_embedder.embed(word_idx)
+        emb = inp
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
         inp = dy.concatenate([inp, paren_tm1_state])
         word_rnn_state = word_rnn_state.add_input(inp)
         # update rule RNN
-        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
-                                                        word_rnn_state.output()]))
+        rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
+                                                        word_rnn_state.output()])
+        if self.feed_word_emb:
+          rnn_inp = dy.concatenate([rnn_inp, emb])
+        rnn_state = rnn_state.add_input(rnn_inp)
         # if this is end of phrase append states list
         if word_idx[0] == Vocab.ES:
           states = np.append(states, rnn_state.output())
@@ -567,12 +576,16 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       prev_word_state = tree_dec_state.prev_word_state
       if open_nonterms[-1].label == u'*':
         inp = word_embedder.embed(trg)
+        emb = inp
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.word_context])
         inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
         word_rnn_state = word_rnn_state.add_input(inp)
-        rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                                        word_rnn_state.output()]))
+        rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                                        word_rnn_state.output()])
+        if self.feed_word_emb:
+          rnn_inp = dy.concatenate([rnn_inp, emb])
+        rnn_state = rnn_state.add_input(rnn_inp)
         if trg == Vocab.ES:
           open_nonterms.pop()
       else:
@@ -588,6 +601,8 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
 
         inp = dy.concatenate([inp, cur_nonterm.parent_state, word_rnn_state.output()])
+        if self.feed_word_emb:
+          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
         rnn_state = rnn_state.add_input(inp)
         # add rule to tree_dec_state.open_nonterms
         new_open_nonterms = []

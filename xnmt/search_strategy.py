@@ -75,7 +75,7 @@ class BeamSearch(SearchStrategy):
 
     completed_hyp = []
     length = 0
-
+    stop_action = False
     while len(completed_hyp) < self.beam_size and length < self.max_len:
       new_set = []
       for hyp in active_hyp:
@@ -108,7 +108,12 @@ class BeamSearch(SearchStrategy):
             dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
           if word_embedder:
-            score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab, is_terminal=dec_state.open_nonterms[-1].label == u'*')
+            score, num_valid_rule, stop_prob = decoder.get_scores(dec_state, trg_rule_vocab, is_terminal=dec_state.open_nonterms[-1].label == u'*')
+            stop_action = False
+            if not stop_prob is None:
+              stop_action = stop_prob.value() > 0.5
+              #print stop_prob.value(), stop_action
+              dec_state.stop_action = stop_action
           else:
             score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
           score = dy.log_softmax(score).npvalue()
@@ -125,7 +130,8 @@ class BeamSearch(SearchStrategy):
         for cur_id in top_ids:
           new_list = list(hyp.id_list)
           if word_embedder:
-            new_list.append([cur_id, dec_state.open_nonterms[-1].label == u'*'])
+            # word/rule index, is_terminal, stop_action
+            new_list.append([cur_id, dec_state.open_nonterms[-1].label == u'*', stop_action])
           else:
             new_list.append(cur_id)
           if trg_rule_vocab:
@@ -149,6 +155,6 @@ class BeamSearch(SearchStrategy):
       return result.id_list, result.score
     else:
       if word_embedder:
-        return [[Vocab.ES, True]], [0]
+        return [[Vocab.ES, True, False]], [0]
       else:
         return [Vocab.ES], [0]

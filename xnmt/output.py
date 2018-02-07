@@ -33,9 +33,9 @@ class TreeHierOutput(Output):
     for a in self.actions:
       #if a[0] in self.filtered_tokens: continue
       if a[1]: # if is terminal
-        ret.append(self.word_vocab[a[0]])
+        ret.append([self.word_vocab[a[0]], a[2]])
       else:
-        ret.append(self.rule_vocab[a[0]])
+        ret.append([self.rule_vocab[a[0]], a[2]])
     return ret
 
 class OutputProcessor(object):

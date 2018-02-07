@@ -398,7 +398,8 @@ class TreeReader(BaseTextReader, Serializable):
   """
     yaml_tag = u'!TreeReader'
 
-    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False, read_word=False, merge=False, merge_level=-1):
+    def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False,
+                 read_word=False, merge=False, merge_level=-1, add_eos=True):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
@@ -406,6 +407,7 @@ class TreeReader(BaseTextReader, Serializable):
         self.read_word = read_word
         self.merge = merge
         self.merge_level = merge_level
+        self.add_eos = add_eos
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -431,7 +433,7 @@ class TreeReader(BaseTextReader, Serializable):
                     merge_depth(tree.root, self.merge_level, 0)
                 # add x after bpe
                 if self.word_vocab:
-                    add_preterminal_wordswitch(tree.root)
+                    add_preterminal_wordswitch(tree.root, self.add_eos)
                     if self.binarize:
                         tree.root = right_binarize(tree.root, self.read_word)
                 else:
@@ -450,7 +452,7 @@ class TreeReader(BaseTextReader, Serializable):
                 if self.merge_level:
                     merge_depth(tree.root, self.merge_level, 0)
                 if self.word_vocab:
-                    add_preterminal_wordswitch(tree.root)
+                    add_preterminal_wordswitch(tree.root, self.add_eos)
                     if self.binarize:
                         tree.root = right_binarize(tree.root, self.read_word)
                 else:
@@ -721,13 +723,21 @@ class Tree(object):
     def from_rule_deriv(cls, derivs):
         tree = Tree()
         stack_tree = [tree.root]
-        for r in derivs:
+        for x in derivs:
+            r, stop = x
             p_tree = stack_tree.pop()
             if type(r) != Rule:
+                if p_tree.label != u'*':
+                    for i in derivs:
+                        if type(i[0]) != Rule:
+                            print i[0].encode('utf-8'), i[1]
+                        else:
+                            print i[0], i[1]
                 assert p_tree.label == u'*', p_tree.label
                 if r != Vocab.ES_STR:
                     p_tree.add_child(r)
-                    stack_tree.append(p_tree)
+                    if not stop:
+                        stack_tree.append(p_tree)
                 continue
             if p_tree.label == 'XXX':
                 new_tree = TreeNode(r.lhs, [])
@@ -735,10 +745,10 @@ class Tree(object):
             else:
                 if p_tree.label != r.lhs:
                     for i in derivs:
-                        if type(i) != Rule:
-                            print i.encode('utf-8')
+                        if type(i[0]) != Rule:
+                            print i[0].encode('utf-8'), i[1]
                         else:
-                            print i
+                            print i[0], i[1]
                     print tree.to_parse_string().encode('utf-8')
                     print p_tree.label.encode('utf-8'), r.lhs.encode('utf-8')
                     exit(1)
@@ -814,8 +824,9 @@ class Tree(object):
             is_terminal = 1 if len(open_nonterms) == 0 else 0
             if word_vocab and is_terminal:
                 for c in node.children:
-                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal]
+                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, 0]
                     data.append(d)
+                data[-1][4] = 1
             else:
                 d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
                     node.last_word_t, is_terminal,
@@ -949,7 +960,7 @@ def add_preterminal(root):
         else:
             add_preterminal(c)
 
-def add_preterminal_wordswitch(root):
+def add_preterminal_wordswitch(root, add_eos):
     ''' Add preterminal X before each terminal symbol '''
     ''' word_switch: one * symbol for each phrase chunk
         preterm_paren: * preterm parent already created
@@ -957,7 +968,8 @@ def add_preterminal_wordswitch(root):
     preterm_paren = None
     new_children = []
     if root.label == u'*':
-        root.add_child(Vocab.ES_STR)
+        if add_eos:
+            root.add_child(Vocab.ES_STR)
         return root
     for i, c in enumerate(root.children):
         if type(c) == str or type(c) == unicode:
@@ -967,12 +979,12 @@ def add_preterminal_wordswitch(root):
                 new_children.append(preterm_paren)
             preterm_paren.add_child(c)
         else:
-            if preterm_paren:
+            if preterm_paren and add_eos:
                 preterm_paren.add_child(Vocab.ES_STR)
-            c = add_preterminal_wordswitch(c)
+            c = add_preterminal_wordswitch(c, add_eos)
             new_children.append(c)
             preterm_paren = None
-    if preterm_paren:
+    if preterm_paren and add_eos:
         preterm_paren.add_child(Vocab.ES_STR)
     root.children = new_children
     return root
@@ -1146,13 +1158,13 @@ if __name__ == "__main__":
     '''
 
 
-    train_parse = "kftt_data/tok/kyoto-train.lowparse.en"
-    train_piece = "kftt_data/tok/kyoto-train.lowpiece.en"
-    parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
-    piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
+    #train_parse = "kftt_data/tok/kyoto-train.lowparse.en"
+    #train_piece = "kftt_data/tok/kyoto-train.lowpiece.en"
+    #parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
+    #piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-
+    '''
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
@@ -1160,7 +1172,7 @@ if __name__ == "__main__":
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
         #merge_depth(t.root, 5, 0)
         merge_tags(t.root)
-        add_preterminal_wordswitch(t.root)
+        add_preterminal_wordswitch(t.root, add_eos=False)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
         print t.to_parse_string().encode('utf-8')
@@ -1174,24 +1186,24 @@ if __name__ == "__main__":
     split_sent_piece(tree.root, sent_piece_segs(piece), 0)
     #merge_depth(tree.root, 3, 0)
     merge_tags(tree.root)
-    tree.root = add_preterminal_wordswitch(tree.root)
+    tree.root = add_preterminal_wordswitch(tree.root, add_eos=False)
     #tree.root = right_binarize(tree.root)
     
     tree.reset_timestep()
     data = tree.get_data_root(rule_vocab, word_vocab)
-    #for d in data:
-    #    print d
-    #    if d[3] == 0:
-    #        print rule_vocab[d[0]]
-    #    else:
-    #        print word_vocab[d[0]]
+    for d in data:
+        print d
+        if d[3] == 0:
+            print rule_vocab[d[0]]
+        else:
+            print word_vocab[d[0]]
     print tree.to_parse_string().encode('utf-8')
     print tree.to_string().encode('utf-8')
     #idx_list = rule_vocab.rule_index_with_lhs('*')
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-    '''
+
 
 ###### Obsolete Functions
 

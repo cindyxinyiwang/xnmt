@@ -146,7 +146,7 @@ class OpenNonterm:
 class TreeDecoderState:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
   def __init__(self, rnn_state=None, word_rnn_state=None, context=None, word_context=None,
-               states=[], tree=None, open_nonterms=[], prev_word_state=None):
+               states=[], tree=None, open_nonterms=[], prev_word_state=None, stop_action=False):
     self.rnn_state = rnn_state
     self.context = context
     self.word_rnn_state = word_rnn_state
@@ -158,13 +158,14 @@ class TreeDecoderState:
     #used at decoding time
     self.open_nonterms = open_nonterms
     self.prev_word_state = prev_word_state
+    self.stop_action = stop_action
 
   def copy(self):
     open_nonterms_copy = []
     for n in self.open_nonterms:
       open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state, n.is_sibling, n.sib_state))
     return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
-                            open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state)
+                            open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state, stop_action=self.stop_action)
 
 class TreeDecoder(RnnDecoder, Serializable):
   # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
@@ -411,13 +412,18 @@ class TreeHierDecoder(RnnDecoder, Serializable):
   def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, start_nonterm='ROOT', feed_word_emb=False):
+               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1):
 
     register_handler(self)
     self.set_word_lstm = True
     param_col = yaml_context.dynet_param_collection.param_col
     self.start_nonterm = start_nonterm
     self.feed_word_emb = feed_word_emb
+    if action_loss_weight > 0:
+      self.action_loss = True
+      self.action_loss_weight = action_loss_weight
+    else:
+      self.action_loss = False
     # Define dim
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
@@ -475,6 +481,13 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     self.word_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
                                          output_dim = word_vocab_size,
                                          model = param_col)
+    if self.action_loss:
+      #self.action_context_projector = xnmt.linear.Linear(input_dim=2*lstm_dim+trg_embed_dim,
+      #                                                output_dim=mlp_hidden_dim,
+      #                                                model=param_col)
+      self.action_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+                                                 output_dim=1,
+                                                 model=param_col)
     # Dropout
     self.dropout = dropout or yaml_context.dropout
 
@@ -531,7 +544,6 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
       is_terminal = trg.get_col(3, batched=False)
       paren_tm1_state = paren_tm1_states[0]
-
       if is_terminal[0] == 0:
         # rule rnn
         rule_idx = trg.get_col(0)
@@ -568,8 +580,16 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                     word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
         # if this is end of phrase append states list
-        if word_idx[0] == Vocab.ES:
-          states = np.append(states, rnn_state.output())
+        if self.action_loss:
+          action = trg.get_col(4)[0]
+          #a_t = dy.tanh(
+          #  self.action_context_projector(dy.concatenate([emb, word_rnn_state.output(), rnn_state.output()])))
+          #a_loss = dy.pickneglogsoftmax(self.action_projector(a_t), action)
+          if action == 1:
+            states = np.append(states, rnn_state.output())
+        else:
+          if word_idx[0] == Vocab.ES:
+            states = np.append(states, rnn_state.output())
 
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
@@ -592,8 +612,14 @@ class TreeHierDecoder(RnnDecoder, Serializable):
           rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                     word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
-        if trg == Vocab.ES:
-          open_nonterms.pop()
+        if self.action_loss:
+          #a_t =  dy.tanh(self.action_context_projector(dy.concatenate([emb, word_rnn_state.output(), rnn_state.output()])))
+          #a_logit_score = dy.log_softmax(self.action_projector(a_t)).npvalue()
+          if tree_dec_state.stop_action:
+            open_nonterms.pop()
+        else:
+          if trg == Vocab.ES:
+            open_nonterms.pop()
       else:
         inp = rule_embedder.embed(trg)
         if self.input_feeding:
@@ -632,15 +658,20 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     :returns: Scores over the vocabulary given this state.
     """
     if is_terminal:
-      h_t = dy.tanh(self.word_context_projector(dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
-                                                                tree_dec_state.rnn_state.output(), tree_dec_state.context])))
-      return self.word_vocab_projector(h_t), -1
+      inp = dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
+                                                                tree_dec_state.rnn_state.output(), tree_dec_state.context])
+      h_t = dy.tanh(self.word_context_projector(inp))
+      if self.action_loss:
+        stop_prob = dy.logistic(self.action_projector(inp))
+        return self.word_vocab_projector(h_t), -1, stop_prob
+      else:
+        return self.word_vocab_projector(h_t), -1, None
     else:
       h_t = dy.tanh(self.rule_context_projector(dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
-                                                                tree_dec_state.word_rnn_state.output(), tree_dec_state.context])))
+                                                                tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])))
     if label_idx >= 0:
       # training
-      return self.rule_vocab_projector(h_t), -1
+      return self.rule_vocab_projector(h_t), -1, None
       #label = trg_rule_vocab.tag_vocab[label_idx]
       #valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:
@@ -651,18 +682,26 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
     valid_y_mask[valid_y_index] = 0.
 
-    return self.rule_vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index)
+    return self.rule_vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index), None
 
   def calc_loss(self, tree_dec_state, ref_action, trg_rule_vocab):
     ref_word = ref_action.get_col(0)
     is_terminal = ref_action.get_col(3)[0]
-    scores, valid_y_len = self.get_scores(tree_dec_state, trg_rule_vocab, is_terminal, 1)
+    is_stop =ref_action.get_col(4)[0]
+    scores, valid_y_len, stop_prob = self.get_scores(tree_dec_state, trg_rule_vocab, is_terminal, 1)
     # single mode
     if not xnmt.batcher.is_batched(ref_action):
-      return dy.pickneglogsoftmax(scores, ref_word)
+      word_loss = dy.pickneglogsoftmax(scores, ref_word)
     # minibatch mode
     else:
-      return dy.pickneglogsoftmax_batch(scores, ref_word)
+      word_loss = dy.pickneglogsoftmax_batch(scores, ref_word)
+    if self.action_loss and is_terminal:
+      if is_stop:
+        word_loss = word_loss - dy.log(stop_prob) * self.action_loss_weight
+      else:
+        word_loss = word_loss - dy.log(1. - stop_prob) * self.action_loss_weight
+      #print is_stop, stop_prob.value()
+    return word_loss
 
   def set_train(self, val):
     self.fwd_lstm.set_dropout(self.dropout if val else 0.0)

@@ -20,7 +20,7 @@ import xnmt.xnmt_preproc, xnmt.xnmt_train, xnmt.xnmt_decode, xnmt.xnmt_evaluate
 from xnmt.options import OptionParser, Option
 from xnmt.tee import Tee
 
-def main(overwrite_args=None):
+def main(overwrite_args=None, dyparams=None):
   argparser = argparse.ArgumentParser()
   argparser.add_argument("--dynet-mem", type=int)
   argparser.add_argument("--dynet-seed", type=int)
@@ -73,6 +73,8 @@ def main(overwrite_args=None):
   if args.dynet_seed:
     random.seed(args.dynet_seed)
     np.random.seed(args.dynet_seed)
+    if dyparams:
+      dyparams.set_random_seed(args.dynet_seed)
 
   config = config_parser.args_from_config_file(args.experiments_file)
 
@@ -167,4 +169,9 @@ if __name__ == '__main__':
   import _dynet
   dyparams = _dynet.DynetParams()
   dyparams.from_args()
-  sys.exit(main())
+  #dyparams.set_random_seed()
+  # best for seq to seq
+  #dyparams.set_random_seed(2868565468)
+  # worst for seq to seq
+  #dyparams.set_random_seed(3345183795)
+  sys.exit(main(dyparams=dyparams))

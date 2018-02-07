@@ -559,10 +559,13 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         inp = dy.concatenate([inp, paren_tm1_state])
         word_rnn_state = word_rnn_state.add_input(inp)
         # update rule RNN
-        rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input-self.lstm_dim),
-                                                        word_rnn_state.output()])
+
         if self.feed_word_emb:
-          rnn_inp = dy.concatenate([rnn_inp, emb])
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                    word_rnn_state.output(), emb])
+        else:
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                    word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
         # if this is end of phrase append states list
         if word_idx[0] == Vocab.ES:
@@ -581,10 +584,13 @@ class TreeHierDecoder(RnnDecoder, Serializable):
           inp = dy.concatenate([inp, tree_dec_state.word_context])
         inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
         word_rnn_state = word_rnn_state.add_input(inp)
-        rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                                        word_rnn_state.output()])
+
         if self.feed_word_emb:
-          rnn_inp = dy.concatenate([rnn_inp, emb])
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                    word_rnn_state.output(), emb])
+        else:
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                    word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
         if trg == Vocab.ES:
           open_nonterms.pop()

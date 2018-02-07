@@ -546,8 +546,6 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         # word rnn
         word_idx = trg.get_col(0)
         # if this is end of phrase append states list
-        if word_idx[0] == Vocab.ES:
-          states = np.append(states, rnn_state.output())
         #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
         inp = word_embedder.embed(word_idx)
         if self.input_feeding:

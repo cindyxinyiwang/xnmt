@@ -1020,26 +1020,31 @@ def merge_depth(root, max_depth, cur_depth):
 
 def merge_tags(root):
     ''' raise up trees whose label is in a given set '''
-    kept_label = set([u'np', u'vp', u'pp', u's', u'root', u'sbar', u'frag', u'sinv' u'in', u'XXX', u'prn'
-                      u'NP', u'VP', u'PP',u'S', u'ROOT', u'SBAR', u'FRAG', u'SINV' u'IN', u'PRN'])
+    kept_label = set([u'np', u'vp', u'pp', u's', u'root', u'sbar', u'sinv', u'XXX', u'prn', u'adjp', u'advp',
+                        u'whnp', u'whadvp',
+                      u'NP', u'VP', u'PP',u'S', u'ROOT', u'SBAR', u'FRAG', u'SINV', u'PRN'])
     if not root.label in kept_label:
-        root.label = u'*'
-        root.children = root.leaf_nodes()
-        return root
-    new_children = []
+        root.label = u'xx'
+        #root.children = root.leaf_nodes()
+        #return root
+    #new_children = []
     for i, c in enumerate(root.children):
         if hasattr(c, 'children'):
             c = merge_tags(c)
             # combine consecutive * nodes
-            if new_children and hasattr(new_children[-1], 'label') and new_children[-1].is_preterminal() and c.is_preterminal():
-                for x in c.children:
-                    new_children[-1].add_child(x)
-            else:
-                new_children.append(c)
-        else:
-            new_children.append(c)
-    root.children = new_children
+            #if new_children and hasattr(new_children[-1], 'label') and new_children[-1].is_preterminal() and c.is_preterminal():
+            #    for x in c.children:
+            #        new_children[-1].add_child(x)
+            #else:
+            #    new_children.append(c)
+        #else:
+            #new_children.append(c)
+        root.children[i] = c
+    #root.children = new_children
     return root
+
+def combine_tags(root):
+    tag_dict = {'adjp': 'advp', 'sq': 'sbarq', 'whadjp': 'whadvp'}
 
 # Tokenize a string.
 # Tokens yielded are of the form (type, string)
@@ -1158,13 +1163,13 @@ if __name__ == "__main__":
     '''
 
 
-    #train_parse = "kftt_data/tok/kyoto-train.lowparse.en"
-    #train_piece = "kftt_data/tok/kyoto-train.lowpiece.en"
-    #parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
-    #piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
+    train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowparse.en"
+    train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowpiece.en"
+    parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
+    piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-    '''
+
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
@@ -1172,7 +1177,7 @@ if __name__ == "__main__":
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
         #merge_depth(t.root, 5, 0)
         merge_tags(t.root)
-        add_preterminal_wordswitch(t.root, add_eos=False)
+        add_preterminal_wordswitch(t.root, add_eos=True)
         t.reset_timestep()
         t.get_data_root(rule_vocab)
         print t.to_parse_string().encode('utf-8')
@@ -1203,7 +1208,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-
+    '''
 
 ###### Obsolete Functions
 

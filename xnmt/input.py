@@ -606,6 +606,17 @@ class TreeNode(object):
                 leaves.append(c)
         return leaves
 
+    def get_leaf_lens(self, len_dict):
+        if self.is_preterminal():
+            l = self.leaf_nodes()
+            #if len(l) > 10:
+            #    print l, len(l)
+            len_dict[len(l)] += 1
+            return
+        for c in self.children:
+            if hasattr(c, 'is_preterminal'):
+                c.get_leaf_lens(len_dict)
+
     def set_timestep(self, t, t2n=None, id2n=None, last_word_t=0, sib_t=0, open_stack=[]):
         '''
     initialize timestep for each node
@@ -1163,13 +1174,15 @@ if __name__ == "__main__":
     '''
 
 
+    #train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-trainunfilt.tok.parse.eng"
+    #train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-trainunfilt.tok.piece.eng"
     train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowparse.en"
     train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowpiece.en"
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-
+    leaf_lens = defaultdict(int)
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
         remove_preterminal_POS(t.root)
@@ -1177,10 +1190,13 @@ if __name__ == "__main__":
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
         #merge_depth(t.root, 5, 0)
         merge_tags(t.root)
-        add_preterminal_wordswitch(t.root, add_eos=True)
+        add_preterminal_wordswitch(t.root, add_eos=False)
         t.reset_timestep()
-        t.get_data_root(rule_vocab)
-        print t.to_parse_string().encode('utf-8')
+        t.root.get_leaf_lens(leaf_lens)
+        #t.get_data_root(rule_vocab)
+        #print t.to_parse_string().encode('utf-8')
+    for w in sorted(leaf_lens, key=leaf_lens.get, reverse=True):
+        print 'len', w, 'count', leaf_lens[w]
     '''
     s = u"(root (s (np (fw i)) (vp (vbp like) (np (prp$ my) (nn steak) (nn medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."

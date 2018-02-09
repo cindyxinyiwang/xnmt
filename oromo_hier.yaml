@@ -1,0 +1,84 @@
+defaults:
+  experiment:
+    model_file: oromo/output/<EXP>.mod
+    hyp_file: oromo/output/<EXP>.hyp
+    out_file: oromo/output/<EXP>.out
+    err_file: oromo/output/<EXP>.err
+    cfg_file: oromo/output/<EXP>.yaml
+    run_for_epochs: 50
+    eval_metrics: bleu
+  train:
+    batcher: !SrcBatcher
+      batch_size: 16
+    dev_every: 50000
+    dropout: 0.3
+    default_layer_dim: 512
+    restart_trainer: False
+    trainer: Adam
+    learning_rate: 0.001
+    lr_decay: 0.5
+    attempts_before_lr_decay: 5
+    dev_metrics: bleu
+    schedule_metric: bleu
+    training_corpus: !BilingualTrainingCorpus
+      train_src: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-trainunfilt.tok.piece.orm
+      train_trg: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-trainunfilt.tok.parse.eng,/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-trainunfilt.tok.piece.eng
+      train_len_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-trainunfilt.tok.piece.eng
+      dev_src: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.tok.piece.orm
+      dev_trg: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.tok.parse.eng,/projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.tok.piece.eng
+      dev_ref_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.tok.eng
+      dev_len_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-dev.tok.piece.eng
+    corpus_parser: !BilingualCorpusParser
+      src_reader: !PlainTextReader {}
+      trg_reader: !TreeReader 
+        binarize: False
+        del_preterm_POS: True
+        read_word: True
+        add_eos: True
+        #merge: False
+        #merge_level: 4
+    model: !DefaultTranslator
+      loop_trg: True
+      src_embedder: !SimpleWordEmbedder {}
+      trg_embedder: !SimpleWordEmbedder {}
+      word_embedder: !SimpleWordEmbedder {}
+      encoder: !LSTMSeqTransducer
+        layers: 1
+      attender: !StandardAttender {}
+      word_attender: !StandardAttender {}
+      decoder: !TreeHierDecoder
+        layers: 1
+        mlp_hidden_dim: 512
+        bridge: !CopyBridge {}
+        start_nonterm: ROOT
+        feed_word_emb: False
+        #len_loss_weight: 3.
+  decode:
+    beam: 15
+    post_process: rule-piece-wordswitch
+    max_len: 200
+    len_norm_type: !PolynomialNormalization
+      apply_during_search: true
+      m: 3
+    src_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.tok.piece.orm
+  evaluate:
+    ref_file: /projects/tir2/users/xinyiw1/loreili/orm-eng/data/set0-test.tok.eng
+
+oromo-tree-hier:
+#  train:
+#    pretrained_model_file: oromo-tree-hier-3-level3-dim256.mod
+#  decode:
+#    beam: 10
+#    len_norm_type: !PolynomialNormalization
+#      apply_during_search: True
+#      m: 1.
+#oromo-tree-hier-unfilt-decode:
+#  experiment:
+#    eval_only: True
+#  train:
+#    pretrained_model_file: oromo/output/oromo-tree-hier-unfilt.mod
+#  decode:
+#    beam: 5
+#    len_norm_type: !PolynomialNormalization
+#      apply_during_search: true
+#      m: 2.

@@ -415,13 +415,15 @@ class TreeHierDecoder(RnnDecoder, Serializable):
   def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1):
+               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1, rule_cond=True,
+               update_ruleRNN=True):
 
     register_handler(self)
     self.set_word_lstm = True
     param_col = yaml_context.dynet_param_collection.param_col
     self.start_nonterm = start_nonterm
     self.feed_word_emb = feed_word_emb
+    self.update_ruleRNN = update_ruleRNN
     if action_loss_weight > 0:
       self.action_loss = True
       self.action_loss_weight = action_loss_weight
@@ -477,7 +479,12 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                               model = param_col,
                                               residual_to_output = residual_to_output)
     # MLP
-    self.rule_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+    self.rule_cond = rule_cond
+    if rule_cond:
+      rule_input = 2*input_dim + 2*lstm_dim
+    else:
+      rule_input = input_dim + lstm_dim
+    self.rule_context_projector = xnmt.linear.Linear(input_dim=rule_input,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
     self.word_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
@@ -586,14 +593,14 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         inp = dy.concatenate([inp, paren_tm1_state])
         word_rnn_state = word_rnn_state.add_input(inp)
         # update rule RNN
-
-        if self.feed_word_emb:
-          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
-                                    word_rnn_state.output(), emb])
-        else:
-          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                    word_rnn_state.output()])
-        rnn_state = rnn_state.add_input(rnn_inp)
+        if self.update_ruleRNN:
+          if self.feed_word_emb:
+            rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                      word_rnn_state.output(), emb])
+          else:
+            rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                      word_rnn_state.output()])
+          rnn_state = rnn_state.add_input(rnn_inp)
         # if this is end of phrase append states list
         if self.action_loss or self.len_loss:
           action = trg.get_col(4)[0]
@@ -622,13 +629,14 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
         word_rnn_state = word_rnn_state.add_input(inp)
 
-        if self.feed_word_emb:
-          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
-                                    word_rnn_state.output(), emb])
-        else:
-          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                    word_rnn_state.output()])
-        rnn_state = rnn_state.add_input(rnn_inp)
+        if self.update_ruleRNN:
+          if self.feed_word_emb:
+            rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                      word_rnn_state.output(), emb])
+          else:
+            rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                      word_rnn_state.output()])
+          rnn_state = rnn_state.add_input(rnn_inp)
 
         if self.action_loss:
           if tree_dec_state.stop_action:
@@ -694,8 +702,11 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       else:
         return self.word_vocab_projector(h_t), -1, None, None
     else:
-      inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
-                                                                tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])
+      if self.rule_cond:
+        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
+                                                                  tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])
+      else:
+        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])
       h_t = dy.tanh(self.rule_context_projector(inp))
 
     if label_idx >= 0:

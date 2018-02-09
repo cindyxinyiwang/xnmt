@@ -731,7 +731,7 @@ class Tree(object):
         return copied_tree
 
     @classmethod
-    def from_rule_deriv(cls, derivs):
+    def from_rule_deriv(cls, derivs, wordswitch=True):
         tree = Tree()
         stack_tree = [tree.root]
         for x in derivs:
@@ -745,13 +745,14 @@ class Tree(object):
                         else:
                             print i[0], i[1]
                 assert p_tree.label == u'*', p_tree.label
-                if r != Vocab.ES_STR:
+                if wordswitch:
+                    if r != Vocab.ES_STR:
+                        p_tree.add_child(r)
+                        stack_tree.append(p_tree)
+                else:
                     p_tree.add_child(r)
                     if not stop:
                         stack_tree.append(p_tree)
-                elif not stop:
-                    p_tree.add_child(r)
-                    stack_tree.append(p_tree)
                 continue
             if p_tree.label == 'XXX':
                 new_tree = TreeNode(r.lhs, [])

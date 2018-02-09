@@ -123,10 +123,14 @@ def output_processor_for_spec(spec):
     return JoinedBPETextOutputProcessor()
   elif spec == "join-piece":
     return JoinedPieceTextOutputProcessor()
+  elif spec == "rule-piece-wordswitch":
+    return RuleOutputProcessor(piece=True, wordswitch=True)
   elif spec == "rule-piece":
-    return RuleOutputProcessor(piece=True)
+    return RuleOutputProcessor(piece=True, wordswitch=False)
+  elif spec == "rule-wordswitch":
+    return RuleOutputProcessor(piece=True, wordswitch=True)
   elif spec == "rule":
-    return RuleOutputProcessor(piece=False)
+    return RuleOutputProcessor(piece=False, wordswitch=False)
   else:
     raise RuntimeError("Unknown postprocessing argument {}".format(spec))
 

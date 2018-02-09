@@ -10,6 +10,28 @@ class SearchStrategy(object):
   def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None):
     raise NotImplementedError('generate_output must be implemented in SearchStrategy subclasses')
 
+class Sampling(SearchStrategy):
+  '''
+  Performs sampling
+  '''
+  def __init__(self, max_len=100):
+    self.max_len = max_len
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None):
+    score = 0.0
+    word_ids = []
+
+    while (word_ids==[] or word_ids[-1]!=Vocab.ES) and len(word_ids) < self.max_len:
+      if len(word_ids) > 0: # don't feed in the initial start-of-sentence token
+        dec_state = decoder.add_input(dec_state, output_embedder.embed(word_ids[-1] if forced_trg_ids is None else forced_trg_ids[len(word_ids)-1]))
+      dec_state.context = attender.calc_context(dec_state.rnn_state.output())
+      softmax = dy.softmax(decoder.get_scores(dec_state)).npvalue()
+
+      cur_id = np.random(softmax)
+      score += softmax[cur_id]
+      word_ids.append(cur_id)
+
+    return word_ids, score
+
 class GreedySearch(SearchStrategy):
   '''
   Performs greedy search (aka beam search with beam size 1)
@@ -114,7 +136,7 @@ class BeamSearch(SearchStrategy):
             score, num_valid_rule, stop_prob, len_score = decoder.get_scores(dec_state, trg_rule_vocab,
                                                                   is_terminal=is_terminal,
                                                                    sample_len=is_first)
-            if is_first:
+            if is_first and (not len_score is None):
               dec_state.step_len = 0
               len_score = dy.log_softmax(len_score).npvalue()
               dec_state.leaf_len = np.argmax(len_score)+1

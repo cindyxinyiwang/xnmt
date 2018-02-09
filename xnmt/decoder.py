@@ -501,7 +501,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                                       output_dim=mlp_hidden_dim,
                                                       model=param_col)
       self.len_projector = xnmt.linear.Linear(input_dim=mlp_hidden_dim,
-                                              output_dim=21,
+                                              output_dim=25,
                                               model=param_col)
     # Dropout
     self.dropout = dropout or yaml_context.dropout
@@ -734,6 +734,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         word_loss = word_loss - dy.log(1. - stop_prob) * self.action_loss_weight
       #print is_stop, stop_prob.value()
     if self.len_loss and is_terminal and leaf_len > 0:
+      if leaf_len > 20: leaf_len = 20
       word_loss += dy.pickneglogsoftmax(len_scores, leaf_len-1) * self.len_loss_weight
     return word_loss
 

@@ -108,12 +108,23 @@ class BeamSearch(SearchStrategy):
             dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
           # only keep rules with the correct rhs
           if word_embedder:
-            score, num_valid_rule, stop_prob = decoder.get_scores(dec_state, trg_rule_vocab, is_terminal=dec_state.open_nonterms[-1].label == u'*')
+            is_terminal = dec_state.open_nonterms[-1].label == u'*'
+            is_first = (dec_state.step_len < 0) and is_terminal
+
+            score, num_valid_rule, stop_prob, len_score = decoder.get_scores(dec_state, trg_rule_vocab,
+                                                                  is_terminal=is_terminal,
+                                                                   sample_len=is_first)
+            if is_first:
+              dec_state.step_len = 0
+              len_score = dy.log_softmax(len_score).npvalue()
+              dec_state.leaf_len = np.argmax(len_score)+1
             stop_action = False
             if not stop_prob is None:
               stop_action = stop_prob.value() > 0.5
               #print stop_prob.value(), stop_action
               dec_state.stop_action = stop_action
+            if dec_state.step_len >= 0 and dec_state.step_len +1 == dec_state.leaf_len:
+              stop_action = True
           else:
             score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
           score = dy.log_softmax(score).npvalue()

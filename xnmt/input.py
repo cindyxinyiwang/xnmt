@@ -749,6 +749,9 @@ class Tree(object):
                     p_tree.add_child(r)
                     if not stop:
                         stack_tree.append(p_tree)
+                elif not stop:
+                    p_tree.add_child(r)
+                    stack_tree.append(p_tree)
                 continue
             if p_tree.label == 'XXX':
                 new_tree = TreeNode(r.lhs, [])
@@ -834,9 +837,11 @@ class Tree(object):
             paren_t = 0 if not node.parent() else node.parent().timestep
             is_terminal = 1 if len(open_nonterms) == 0 else 0
             if word_vocab and is_terminal:
+                leaf_len = len(node.children)
                 for c in node.children:
-                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, 0]
+                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, 0, leaf_len]
                     data.append(d)
+                    leaf_len = -1
                 data[-1][4] = 1
             else:
                 d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
@@ -1182,6 +1187,7 @@ if __name__ == "__main__":
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
+    '''
     leaf_lens = defaultdict(int)
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
@@ -1224,7 +1230,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-    '''
+
 
 ###### Obsolete Functions
 

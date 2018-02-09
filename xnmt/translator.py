@@ -114,6 +114,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
     search_args = {}
     if kwargs.get("max_len", None) is not None: search_args["max_len"] = kwargs["max_len"]
+    self.sample_num = kwargs["sample_num"]
     if kwargs.get("sample_num", -1) > 0:
       search_args["sample_num"] = kwargs["sample_num"]
       self.search_strategy = Sampling(**search_args)
@@ -189,20 +190,50 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       assert src_mask is not None
     outputs = []
     for sents in src:
-      self.start_sent()
-      embeddings = self.src_embedder.embed_sent(src)
-      encodings = self.encoder(embeddings)
-      self.attender.init_sent(encodings)
-      if self.word_attender:
-        self.word_attender.init_sent(encodings)
-      ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-      if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
-        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss), decoding=True)
+      if self.sample_num > 0:
+        output_actions = []
+        score = []
+        for i in range(self.sample_num):
+          self.start_sent()
+          embeddings = self.src_embedder.embed_sent(src)
+          encodings = self.encoder(embeddings)
+          self.attender.init_sent(encodings)
+          if self.word_attender:
+            self.word_attender.init_sent(encodings)
+          ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
+          if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+
+            dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss),
+                                                   decoding=True)
+          else:
+            dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
+          o, s = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder,
+                                                                       dec_state, src_length=len(sents),
+                                                                       forced_trg_ids=forced_trg_ids,
+                                                                       trg_rule_vocab=trg_rule_vocab,
+                                                                       tag_embedder=self.tag_embedder,
+                                                                       word_attender=self.word_attender,
+                                                                       word_embedder=self.word_embedder)
+          output_actions.append(o)
+          score.append(s)
+          dy.renew_cg()
       else:
-        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
-      output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder, dec_state, src_length=len(sents),
-                                                                   forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab, tag_embedder=self.tag_embedder,
-                                                                   word_attender=self.word_attender, word_embedder=self.word_embedder)
+        self.start_sent()
+        embeddings = self.src_embedder.embed_sent(src)
+        encodings = self.encoder(embeddings)
+        self.attender.init_sent(encodings)
+        if self.word_attender:
+          self.word_attender.init_sent(encodings)
+        ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
+        if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+          dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss),
+                                                 decoding=True)
+        else:
+          dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
+        output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder,
+                                                                     dec_state, src_length=len(sents),
+                                                                     forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab, tag_embedder=self.tag_embedder,
+                                                                     word_attender=self.word_attender, word_embedder=self.word_embedder)
       # In case of reporting
       if self.report_path is not None:
         src_words = [self.reporting_src_vocab[w] for w in sents]

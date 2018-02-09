@@ -12,7 +12,7 @@ from xnmt.vocab import Vocab
 from xnmt.events import register_xnmt_event_assign, register_handler
 from xnmt.generator import GeneratorModel
 from xnmt.serializer import Serializable, DependentInitParam
-from xnmt.search_strategy import BeamSearch, GreedySearch
+from xnmt.search_strategy import BeamSearch, GreedySearch, Sampling
 from xnmt.output import TextOutput, TreeHierOutput
 from xnmt.reports import Reportable
 import xnmt.serializer
@@ -46,8 +46,9 @@ class Translator(GeneratorModel):
     """
     self.trg_vocab = trg_vocab
 
-  def set_post_processor(self, post_processor):
+  def set_post_processor(self, post_processor, sampling=False):
     self.post_processor = post_processor
+    self.sampling = sampling
 
 class DefaultTranslator(Translator, Serializable, Reportable):
   '''
@@ -113,12 +114,16 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
     search_args = {}
     if kwargs.get("max_len", None) is not None: search_args["max_len"] = kwargs["max_len"]
-    if kwargs.get("beam", None) is None:
-      self.search_strategy = GreedySearch(**search_args)
+    if kwargs.get("sample_num", -1) > 0:
+      search_args["sample_num"] = kwargs["sample_num"]
+      self.search_strategy = Sampling(**search_args)
     else:
-      search_args["beam_size"] = kwargs.get("beam", 1)
-      search_args["len_norm"] = len_norm
-      self.search_strategy = BeamSearch(**search_args)
+      if kwargs.get("beam", None) is None:
+        self.search_strategy = GreedySearch(**search_args)
+      else:
+        search_args["beam_size"] = kwargs.get("beam", 1)
+        search_args["len_norm"] = len_norm
+        self.search_strategy = BeamSearch(**search_args)
     self.report_path = kwargs.get("report_path", None)
     self.report_type = kwargs.get("report_type", None)
 
@@ -208,13 +213,67 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         self.set_report_path('{}.{}'.format(self.report_path, str(idx)))
         self.generate_report(self.report_type)
       # Append output to the outputs
+      if type(self.search_strategy) == Sampling:
+        if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
+          if self.word_embedder:
+            for action in output_actions:
+              outputs.append(TreeHierOutput(action, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
+          else:
+            for action in output_actions:
+              outputs.append(TextOutput(action, self.trg_vocab))
+        else:
+          for action, s in zip(output_actions, score):
+            outputs.append((action, s))
+      else:
+        if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
+          if self.word_embedder:
+            outputs.append(TreeHierOutput(output_actions, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
+          else:
+            outputs.append(TextOutput(output_actions, self.trg_vocab))
+        else:
+          outputs.append((output_actions, score))
+    return outputs
+
+  def sample(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None, word_vocab=None, sample_num=30):
+    if hasattr(self.decoder, 'decoding'):
+      self.decoder.decoding = True
+    if not xnmt.batcher.is_batched(src):
+      src = xnmt.batcher.mark_as_batch([src])
+    else:
+      assert src_mask is not None
+    outputs = []
+    for sents in src:
+      self.start_sent()
+      embeddings = self.src_embedder.embed_sent(src)
+      encodings = self.encoder(embeddings)
+      self.attender.init_sent(encodings)
+      if self.word_attender:
+        self.word_attender.init_sent(encodings)
+      ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
+      if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss),
+                                               decoding=True)
+      else:
+        dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss))
+      output_actions_list, score_list = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder,
+                                                                   dec_state, src_length=len(sents),
+                                                                   forced_trg_ids=forced_trg_ids,
+                                                                   trg_rule_vocab=trg_rule_vocab,
+                                                                   tag_embedder=self.tag_embedder,
+                                                                   word_attender=self.word_attender,
+                                                                   word_embedder=self.word_embedder)
+
+      # Append output to the outputs
       if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
         if self.word_embedder:
-          outputs.append(TreeHierOutput(output_actions, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
+          for action in output_actions_list:
+            outputs.append(TreeHierOutput(action, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
         else:
-          outputs.append(TextOutput(output_actions, self.trg_vocab))
+          for action in output_actions_list:
+            outputs.append(TextOutput(action, self.trg_vocab))
       else:
-        outputs.append((output_actions, score))
+        for action, score in zip(output_actions_list, score_list):
+          outputs.append((action, score))
     return outputs
 
   def set_reporting_src_vocab(self, src_vocab):

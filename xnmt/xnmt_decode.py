@@ -33,6 +33,7 @@ options = [
   Option("report_type", str, default_value="html", required=False, help_str="report to generate file/html. Can be multiple, separate with comma."),
   Option("beam", int, default_value=1),
   Option("max_len", int, default_value=100),
+  Option("sample_num", int, default_value=-1, required=False),
   Option("len_norm_type", str, required=False),
   Option("mode", str, default_value="onebest", help_str="type of decoding to perform. onebest: generate one best. forced: perform forced decoding."),
 ]
@@ -78,10 +79,11 @@ def xnmt_decode(args, model_elements=None):
   # Perform initialization
   generator.set_train(False)
   generator.initialize_generator(**args.params_as_dict)
-
+  sampling = args.sample_num >=0
   # TODO: Structure it better. not only Translator can have post processes
   if issubclass(generator.__class__, Translator):
-    generator.set_post_processor(output_processor_for_spec(args.post_process))
+
+    generator.set_post_processor(output_processor_for_spec(args.post_process), sampling=sampling)
     generator.set_trg_vocab(trg_vocab)
     generator.set_reporting_src_vocab(src_vocab)
 
@@ -104,13 +106,27 @@ def xnmt_decode(args, model_elements=None):
         if rule_decode:
           outputs_list= generator.generate_output(src, i, trg_rule_vocab=trg_vocab, word_vocab=word_vocab)
           # output both the parse trees and sentence
-          outputs, tree = outputs_list[0], outputs_list[1]
-          trg_parse.write(u"{}\n".format(tree))
+
+          if sampling:
+            for o, t in outputs_list:
+              trg_parse.write(u"{}\n".format(t))
+              fp.write(u"{}\n".format(o))
+            trg_parse.write(u"\n")
+            fp.write(u"\n")
+          else:
+            outputs, tree = outputs_list[0], outputs_list[1]
+            trg_parse.write(u"{}\n".format(tree))
+            fp.write(u"{}\n".format(outputs))
         else:
           ref_ids = ref_corpus[i] if ref_corpus != None else None
           outputs = generator.generate_output(src, i, forced_trg_ids=ref_ids)
-      # Printing to trg file
-      fp.write(u"{}\n".format(outputs))
+          # Printing to trg file
+          if sampling:
+            for o in outputs:
+              fp.write(u"{}\n".format(o))
+            fp.write(u"\n")
+          else:
+            fp.write(u"{}\n".format(outputs))
   if rule_decode:
     trg_parse.close()
 

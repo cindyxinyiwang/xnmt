@@ -6,7 +6,9 @@ class GeneratorModel(object):
     generation_output = self.generate(*args, **kwargs)
     # Post process it
     if hasattr(self, "post_processor"):
-      generation_output = self.post_processor.process_outputs(generation_output)[0]
+      generation_output = self.post_processor.process_outputs(generation_output)
+      if not self.sampling:
+        generation_output = generation_output[0]
     return generation_output
 
   def generate(self, *args, **kwargs):

@@ -14,23 +14,83 @@ class Sampling(SearchStrategy):
   '''
   Performs sampling
   '''
-  def __init__(self, max_len=100):
+  def __init__(self, max_len=100, sample_num=20):
     self.max_len = max_len
-  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, forced_trg_ids=None):
-    score = 0.0
-    word_ids = []
+    self.sample_num = sample_num
+  def generate_output(self, decoder, attender, output_embedder, dec_state, src_length=None, word_embedder=None,
+                      forced_trg_ids=None, trg_rule_vocab=None, tag_embedder=None, word_attender=None):
+    score_list = []
+    word_ids_list = []
+    if trg_rule_vocab:
+      init_dec_state = dec_state.copy()
+    for i in range(self.sample_num):
+      word_ids = []
+      score = 0.0
+      dec_state = init_dec_state.copy()
+      while (word_ids==[] or word_ids[-1]!=Vocab.ES) and len(word_ids) < self.max_len:
+        if len(word_ids) > 0:
+          if trg_rule_vocab:
+            if word_embedder:
+              dec_state = decoder.add_input(dec_state,
+                                            word_ids[-1][0] if forced_trg_ids is None else forced_trg_ids[len(word_ids) - 1],
+                                            word_embedder,
+                                            output_embedder,
+                                            trg_rule_vocab=trg_rule_vocab, tag_embedder=tag_embedder)
+            else:
+              dec_state = decoder.add_input(dec_state, output_embedder.embed(
+                word_ids[-1][0] if forced_trg_ids is None else forced_trg_ids[len(word_ids) - 1]),
+                                            word_ids[-1], trg_rule_vocab, tag_embedder)
+            if len(dec_state.open_nonterms) == 0:
+              # only know if the stack is empty after we add the current rule back to the tree
+              break
+          else:
+            if word_ids[-1] == Vocab.ES:
+              break
+            dec_state = decoder.add_input(dec_state, output_embedder.embed(
+              word_ids[-1] if forced_trg_ids is None else forced_trg_ids[len(word_ids) - 1]))
+        dec_state.context = attender.calc_context(dec_state.rnn_state.output())
+        if trg_rule_vocab:
+          if decoder.set_word_lstm:
+            dec_state.word_context = word_attender.calc_context(dec_state.word_rnn_state.output())
+          # only keep rules with the correct rhs
+          if word_embedder:
+            is_terminal = dec_state.open_nonterms[-1].label == u'*'
+            is_first = (dec_state.step_len < 0) and is_terminal
 
-    while (word_ids==[] or word_ids[-1]!=Vocab.ES) and len(word_ids) < self.max_len:
-      if len(word_ids) > 0: # don't feed in the initial start-of-sentence token
-        dec_state = decoder.add_input(dec_state, output_embedder.embed(word_ids[-1] if forced_trg_ids is None else forced_trg_ids[len(word_ids)-1]))
-      dec_state.context = attender.calc_context(dec_state.rnn_state.output())
-      softmax = dy.softmax(decoder.get_scores(dec_state)).npvalue()
+            score, num_valid_rule, stop_prob, len_score = decoder.get_scores(dec_state, trg_rule_vocab,
+                                                                             is_terminal=is_terminal,
+                                                                             sample_len=is_first)
+            if is_first and (not len_score is None):
+              dec_state.step_len = 0
+              len_score = dy.log_softmax(len_score).npvalue()
+              dec_state.leaf_len = np.argmax(len_score) + 1
+            stop_action = False
+            if not stop_prob is None:
+              stop_action = stop_prob.value() > 0.5
+              # print stop_prob.value(), stop_action
+              dec_state.stop_action = stop_action
+            if dec_state.step_len >= 0 and dec_state.step_len + 1 == dec_state.leaf_len:
+              stop_action = True
+          else:
+            score, num_valid_rule = decoder.get_scores(dec_state, trg_rule_vocab)
+          softmax = dy.softmax(score).npvalue()
+        else:
+          softmax = dy.softmax(decoder.get_scores(dec_state)).npvalue()
 
-      cur_id = np.random(softmax)
-      score += softmax[cur_id]
-      word_ids.append(cur_id)
+        cur_id = np.random.choice(len(softmax), p=softmax / sum(softmax))
+        score += softmax[cur_id]
 
-    return word_ids, score
+        if word_embedder:
+          # word/rule index, is_terminal, stop_action
+          word_ids.append([cur_id, dec_state.open_nonterms[-1].label == u'*', stop_action])
+        else:
+          word_ids.append(cur_id)
+
+
+      word_ids_list.append(word_ids)
+      score_list.append(score)
+
+    return word_ids_list, score_list
 
 class GreedySearch(SearchStrategy):
   '''

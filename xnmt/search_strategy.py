@@ -26,7 +26,8 @@ class Sampling(SearchStrategy):
     for i in range(self.sample_num):
       word_ids = []
       score = 0.0
-      dec_state = init_dec_state.copy()
+      if trg_rule_vocab:
+        dec_state = init_dec_state.copy()
       while (word_ids==[] or word_ids[-1]!=Vocab.ES) and len(word_ids) < self.max_len:
         if len(word_ids) > 0:
           if trg_rule_vocab:

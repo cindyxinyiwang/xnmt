@@ -1,0 +1,81 @@
+defaults:
+  experiment:
+    model_file: kftt/output/<EXP>.mod
+    hyp_file: kftt/output/<EXP>.hyp
+    out_file: kftt/output/<EXP>.out
+    err_file: kftt/output/<EXP>.err
+    cfg_file: kftt/output/<EXP>.yaml
+    run_for_epochs: 30
+    eval_metrics: bleu
+  train:
+    batcher: !SrcBatcher
+      batch_size: 16
+    #dev_every: 50000
+    dropout: 0.3
+    default_layer_dim: 512
+    restart_trainer: False
+    trainer: Adam
+    learning_rate: 0.001
+    lr_decay: 0.5
+    attempts_before_lr_decay: 5
+    dev_metrics: bleu
+    schedule_metric: bleu
+    training_corpus: !BilingualTrainingCorpus
+      train_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.ja
+      train_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.en
+      train_len_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-train.lowpiece.en
+      dev_src: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.ja
+      dev_trg: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowparse.en,/projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.en
+      dev_ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lower.en
+      dev_len_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.en
+    corpus_parser: !BilingualCorpusParser
+      src_reader: !PlainTextReader {}
+      trg_reader: !TreeReader 
+        binarize: False
+        del_preterm_POS: True
+        read_word: True
+        merge: False
+        merge_level: 4
+        add_eos: True
+    model: !DefaultTranslator
+      loop_trg: True
+      src_embedder: !SimpleWordEmbedder {}
+      trg_embedder: !SimpleWordEmbedder {}
+      word_embedder: !SimpleWordEmbedder {}
+      encoder: !LSTMSeqTransducer
+        layers: 1
+      attender: !StandardAttender {}
+      word_attender: !StandardAttender {}
+      decoder: !TreeHierDecoder
+        layers: 1
+        mlp_hidden_dim: 512
+        bridge: !CopyBridge {}
+        start_nonterm: root
+        rule_cond: True
+        update_ruleRNN: True
+  decode:
+    beam: 5
+    post_process: rule-piece-wordswitch
+    max_len: 200
+    len_norm_type: !PolynomialNormalization
+      apply_during_search: true
+    src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lowpiece.ja
+  evaluate:
+    ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-test.lower.en
+
+#kftt-tree-hier-2:
+#  train:
+#    pretrained_model_file: kftt/output/kftt-tree-hier.mod
+
+kftt-tree-hier-full-2-level4:
+  #train:
+  #  pretrained_model_file: kftt/output/kftt-tree-hier-0.03125-seed2.mod
+  decode:
+    max_len: 200
+    len_norm_type: !PolynomialNormalization
+      apply_during_search: True
+      m: 2.
+    beam: 8
+    src_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lowpiece.ja
+  evaluate:
+    ref_file: /projects/tir2/users/xinyiw1/kftt-data-1.0/data/tok/kyoto-dev.lower.en

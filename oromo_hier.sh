@@ -7,7 +7,8 @@
 module load singularity
 singularity shell --nv /projects/tir1/singularity/ubuntu-16.04-lts_tensorflow-1.4.0_cudnn-8.0-v6.0.img
 
-python xnmt/xnmt_run_experiments.py examples/oromo_hier.yaml \
+python xnmt/xnmt_run_experiments.py oromo_hier.yaml \
 		--dynet-gpu \
 		--dynet-mem 10000 \
-		--dynet-autobatch 0
+		--dynet-autobatch 0 \
+		--dynet-seed 2

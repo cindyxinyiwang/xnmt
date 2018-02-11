@@ -114,7 +114,7 @@ def xnmt_decode(args, model_elements=None):
             x = 0
             for o, t in outputs:
               trg_parse.write(u"{}\n".format(t))
-              fp.write(u"{} ||| {} ||| {}\n".format(i, o, scores[x]))
+              fp.write(u"{} ||| {} ||| {} ||| ll={}\n".format(i, o, scores[x], scores[x]))
               x += 1
           else:
             outputs, tree = outputs[0], outputs[1]
@@ -126,7 +126,7 @@ def xnmt_decode(args, model_elements=None):
           # Printing to trg file
           if sampling or output_beam:
             for o, s in zip(outputs, scores):
-              fp.write(u"{} ||| {} ||| {}\n".format(i, o, s))
+              fp.write(u"{} ||| {} ||| {} ||| ll={}\n".format(i, o, s, s))
           else:
             fp.write(u"{}\n".format(outputs))
   if rule_decode:

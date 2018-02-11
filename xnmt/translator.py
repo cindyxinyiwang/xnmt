@@ -46,9 +46,10 @@ class Translator(GeneratorModel):
     """
     self.trg_vocab = trg_vocab
 
-  def set_post_processor(self, post_processor, sampling=False):
+  def set_post_processor(self, post_processor, sampling=False, output_beam=0):
     self.post_processor = post_processor
     self.sampling = sampling
+    self.output_beam = output_beam
 
 class DefaultTranslator(Translator, Serializable, Reportable):
   '''
@@ -115,9 +116,12 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     search_args = {}
     if kwargs.get("max_len", None) is not None: search_args["max_len"] = kwargs["max_len"]
     self.sample_num = kwargs["sample_num"]
+    self.sampling = False
+    self.output_beam = False
     if kwargs.get("sample_num", -1) > 0:
       search_args["sample_num"] = kwargs["sample_num"]
       self.search_strategy = Sampling(**search_args)
+      self.sampling= True
     else:
       if kwargs.get("beam", None) is None:
         self.search_strategy = GreedySearch(**search_args)
@@ -125,6 +129,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         search_args["beam_size"] = kwargs.get("beam", 1)
         search_args["len_norm"] = len_norm
         self.search_strategy = BeamSearch(**search_args)
+        if kwargs.get("output_beam", 0) > 0:
+          self.output_beam = kwargs["output_beam"]
     self.report_path = kwargs.get("report_path", None)
     self.report_type = kwargs.get("report_type", None)
 
@@ -189,6 +195,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     else:
       assert src_mask is not None
     outputs = []
+    scores = []
     for sents in src:
       if self.sample_num > 0:
         output_actions = []
@@ -233,7 +240,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         output_actions, score = self.search_strategy.generate_output(self.decoder, self.attender, self.trg_embedder,
                                                                      dec_state, src_length=len(sents),
                                                                      forced_trg_ids=forced_trg_ids, trg_rule_vocab=trg_rule_vocab, tag_embedder=self.tag_embedder,
-                                                                     word_attender=self.word_attender, word_embedder=self.word_embedder)
+                                                                     word_attender=self.word_attender, word_embedder=self.word_embedder,
+                                                                     output_beam=self.output_beam)
       # In case of reporting
       if self.report_path is not None:
         src_words = [self.reporting_src_vocab[w] for w in sents]
@@ -244,17 +252,18 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         self.set_report_path('{}.{}'.format(self.report_path, str(idx)))
         self.generate_report(self.report_type)
       # Append output to the outputs
-      if type(self.search_strategy) == Sampling:
+      if self.sampling or self.output_beam:
         if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
           if self.word_embedder:
             for action in output_actions:
-              outputs.append(TreeHierOutput(action, rule_vocab=self.trg_vocab, word_vocab=word_vocab))
+              outputs.append( TreeHierOutput(action, rule_vocab=self.trg_vocab, word_vocab=word_vocab) )
           else:
             for action in output_actions:
               outputs.append(TextOutput(action, self.trg_vocab))
         else:
-          for action, s in zip(output_actions, score):
-            outputs.append((action, s))
+          for action in output_actions:
+            outputs.append(action)
+        scores.extend(score)
       else:
         if hasattr(self, "trg_vocab") and self.trg_vocab is not None:
           if self.word_embedder:
@@ -263,7 +272,10 @@ class DefaultTranslator(Translator, Serializable, Reportable):
             outputs.append(TextOutput(output_actions, self.trg_vocab))
         else:
           outputs.append((output_actions, score))
-    return outputs
+    if self.sampling or self.output_beam:
+      return outputs, scores
+    else:
+      return outputs
 
   def sample(self, src, idx, src_mask=None, forced_trg_ids=None, trg_rule_vocab=None, word_vocab=None, sample_num=30):
     if hasattr(self.decoder, 'decoding'):

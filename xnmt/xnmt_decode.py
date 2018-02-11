@@ -34,6 +34,7 @@ options = [
   Option("beam", int, default_value=1),
   Option("max_len", int, default_value=100),
   Option("sample_num", int, default_value=-1, required=False),
+  Option("output_beam", int, default_value=0, required=False),
   Option("len_norm_type", str, required=False),
   Option("mode", str, default_value="onebest", help_str="type of decoding to perform. onebest: generate one best. forced: perform forced decoding."),
 ]
@@ -80,10 +81,13 @@ def xnmt_decode(args, model_elements=None):
   generator.set_train(False)
   generator.initialize_generator(**args.params_as_dict)
   sampling = args.sample_num >=0
+  output_beam = args.output_beam
   # TODO: Structure it better. not only Translator can have post processes
   if issubclass(generator.__class__, Translator):
 
-    generator.set_post_processor(output_processor_for_spec(args.post_process), sampling=sampling)
+    generator.set_post_processor(output_processor_for_spec(args.post_process),
+                                 sampling=sampling,
+                                 output_beam=args.output_beam)
     generator.set_trg_vocab(trg_vocab)
     generator.set_reporting_src_vocab(src_vocab)
 
@@ -104,27 +108,25 @@ def xnmt_decode(args, model_elements=None):
       else:
         dy.renew_cg()
         if rule_decode:
-          outputs_list= generator.generate_output(src, i, trg_rule_vocab=trg_vocab, word_vocab=word_vocab)
           # output both the parse trees and sentence
-
-          if sampling:
-            for o, t in outputs_list:
+          outputs, scores = generator.generate_output(src, i, trg_rule_vocab=trg_vocab, word_vocab=word_vocab)
+          if sampling or output_beam:
+            x = 0
+            for o, t in outputs:
               trg_parse.write(u"{}\n".format(t))
-              fp.write(u"{}\n".format(o))
-            trg_parse.write(u"\n")
-            fp.write(u"\n")
+              fp.write(u"{} ||| {} ||| {}\n".format(i, o, scores[x]))
+              x += 1
           else:
-            outputs, tree = outputs_list[0], outputs_list[1]
+            outputs, tree = outputs[0], outputs[1]
             trg_parse.write(u"{}\n".format(tree))
             fp.write(u"{}\n".format(outputs))
         else:
+          outputs, scores = generator.generate_output(src, i)
           ref_ids = ref_corpus[i] if ref_corpus != None else None
-          outputs = generator.generate_output(src, i, forced_trg_ids=ref_ids)
           # Printing to trg file
-          if sampling:
-            for o in outputs:
-              fp.write(u"{}\n".format(o))
-            fp.write(u"\n")
+          if sampling or output_beam:
+            for o, s in zip(outputs, scores):
+              fp.write(u"{} ||| {} ||| {}\n".format(i, o, s))
           else:
             fp.write(u"{}\n".format(outputs))
   if rule_decode:

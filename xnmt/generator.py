@@ -2,14 +2,17 @@ from xnmt.events import register_xnmt_event, register_xnmt_event_sum
 
 class GeneratorModel(object):
   def generate_output(self, *args, **kwargs):
-    # Generate the output
-    generation_output = self.generate(*args, **kwargs)
     # Post process it
     if hasattr(self, "post_processor"):
-      generation_output = self.post_processor.process_outputs(generation_output)
-      if not self.sampling:
+      if self.sampling or self.output_beam:
+        generation_output, scores = self.generate(*args, **kwargs)
+        generation_output = self.post_processor.process_outputs(generation_output)
+        return generation_output, scores
+      else:
+        generation_output = self.generate(*args, **kwargs)
+        generation_output = self.post_processor.process_outputs(generation_output)
         generation_output = generation_output[0]
-    return generation_output
+        return generation_output, None
 
   def generate(self, *args, **kwargs):
     raise NotImplementedError()

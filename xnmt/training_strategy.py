@@ -52,7 +52,7 @@ class TrainingMLELoss(Serializable):
       dec_state.context = translator.attender.calc_context(dec_state.rnn_state.output(), pick_src_elem)
       if trg_is_list:
           if translator.word_embedder:
-            if ref_word.get_col(3)[0] and ref_word.get_col(4)[6]: # is terminal and is first word
+            if ref_word.get_col(3)[0] and ref_word.get_col(6)[0]: # is terminal and is first word
               dec_state = translator.decoder.init_wordRNN(dec_state,
                                                          #prev_word_emb=translator.word_embedder.embed(ref_word.get_col(2)),
                                                        prev_word_emb=translator.word_embedder.embed(Vocab.ES),

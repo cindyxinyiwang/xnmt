@@ -178,9 +178,9 @@ class BeamSearch(SearchStrategy):
           if word_embedder:
             is_terminal = dec_state.open_nonterms[-1].label == u'*'
             is_first = (dec_state.step_len < 0) and is_terminal
-            if is_first:
-              dec_state = decoder.init_wordRNN(dec_state, prev_word_emb=word_embedder.embed(Vocab.ES))
-              dec_state.step_len = 0
+            #if is_first:
+            #  dec_state = decoder.init_wordRNN(dec_state, prev_word_emb=word_embedder.embed(Vocab.ES))
+            #  dec_state.step_len = 0
             score, num_valid_rule, stop_prob, len_score = decoder.get_scores(dec_state, trg_rule_vocab,
                                                                   is_terminal=is_terminal,
                                                                    sample_len=is_first)

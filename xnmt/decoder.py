@@ -405,6 +405,360 @@ class TreeDecoder(RnnDecoder, Serializable):
     if self.set_word_lstm:
       self.word_lstm.set_dropout(self.dropout if val else 0.0)
 
+class TreeHierFixtransDecoder(RnnDecoder, Serializable):
+  # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
+  # For now the default behavior is hard coded.
+
+  yaml_tag = u'!TreeHierFixtransDecoder'
+
+
+  def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
+               mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
+               rnn_spec="lstm", residual_to_output=False, input_feeding=True,
+               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1, rule_cond=True,
+               update_ruleRNN=True):
+
+    register_handler(self)
+    self.set_word_lstm = True
+    param_col = yaml_context.dynet_param_collection.param_col
+    self.start_nonterm = start_nonterm
+    self.feed_word_emb = feed_word_emb
+    self.update_ruleRNN = update_ruleRNN
+    if action_loss_weight > 0:
+      self.action_loss = True
+      self.action_loss_weight = action_loss_weight
+    else:
+      self.action_loss = False
+    if len_loss_weight > 0:
+      self.len_loss = True
+      self.len_loss_weight = len_loss_weight
+    else:
+      self.len_loss = False
+    # Define dim
+    lstm_dim       = lstm_dim or yaml_context.default_layer_dim
+    mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
+    trg_embed_dim  = trg_embed_dim or yaml_context.default_layer_dim
+    tag_embed_dim = tag_embed_dim or yaml_context.default_layer_dim
+    input_dim      = input_dim or yaml_context.default_layer_dim
+    self.input_dim = input_dim
+    # Input feeding
+    self.input_feeding = input_feeding
+    self.lstm_dim = lstm_dim
+    self.trg_embed_dim = trg_embed_dim
+    rule_lstm_input = trg_embed_dim
+    word_lstm_input = trg_embed_dim
+    if input_feeding:
+      rule_lstm_input += input_dim
+      word_lstm_input += input_dim
+
+    # parent state + wordRNN output
+    rule_lstm_input += lstm_dim*2
+    if self.feed_word_emb:
+      rule_lstm_input += trg_embed_dim
+    # ruleRNN output
+    word_lstm_input += lstm_dim
+
+    self.rule_lstm_input = rule_lstm_input
+    self.word_lstm_input = word_lstm_input
+    # Bridge
+    self.lstm_layers = layers
+    self.bridge = bridge or NoBridge(yaml_context, self.lstm_layers, self.lstm_dim)
+
+    # LSTM
+    self.fwd_lstm  = RnnDecoder.rnn_from_spec(spec       = rnn_spec,
+                                              num_layers = layers,
+                                              input_dim  = rule_lstm_input,
+                                              hidden_dim = lstm_dim,
+                                              model = param_col,
+                                              residual_to_output = residual_to_output)
+
+    self.word_lstm = RnnDecoder.rnn_from_spec(spec       = rnn_spec,
+                                              num_layers = layers,
+                                              input_dim  = word_lstm_input,
+                                              hidden_dim = lstm_dim,
+                                              model = param_col,
+                                              residual_to_output = residual_to_output)
+    # MLP
+    self.rule_cond = rule_cond
+    if rule_cond:
+      rule_input = 2*input_dim + 2*lstm_dim
+    else:
+      rule_input = input_dim + lstm_dim
+    self.rule_context_projector = xnmt.linear.Linear(input_dim=rule_input,
+                                                output_dim=mlp_hidden_dim,
+                                                model=param_col)
+    self.word_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+                                                output_dim=mlp_hidden_dim,
+                                                model=param_col)
+    self.rule_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
+                                         output_dim = vocab_size,
+                                         model = param_col)
+    self.word_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
+                                         output_dim = word_vocab_size,
+                                         model = param_col)
+    if self.action_loss:
+      #self.action_context_projector = xnmt.linear.Linear(input_dim=2*lstm_dim+trg_embed_dim,
+      #                                                output_dim=mlp_hidden_dim,
+      #                                                model=param_col)
+      self.action_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
+                                                 output_dim=1,
+                                                 model=param_col)
+    if self.len_loss:
+      self.len_context_projector = xnmt.linear.Linear(input_dim=2*lstm_dim+2*input_dim,
+                                                      output_dim=mlp_hidden_dim,
+                                                      model=param_col)
+      self.len_projector = xnmt.linear.Linear(input_dim=mlp_hidden_dim,
+                                              output_dim=25,
+                                              model=param_col)
+    # Dropout
+    self.dropout = dropout or yaml_context.dropout
+
+  def shared_params(self):
+    return [set(["layers", "bridge.dec_layers"]),
+            set(["lstm_dim", "bridge.dec_dim"])]
+
+  def initial_state(self, enc_final_states, ss_expr, decoding=False):
+    """Get the initial state of the decoder given the encoder final states.
+
+    :param enc_final_states: The encoder final states.
+    :returns: An MlpSoftmaxDecoderState
+    """
+    init_state = self.bridge.decoder_init(enc_final_states)
+    # init_state: [c, h]
+    word_rnn_state = self.word_lstm.initial_state()
+    word_rnn_state = word_rnn_state.set_s(init_state)
+    zeros_word_rnn = dy.zeros(self.word_lstm_input - self.trg_embed_dim)
+    word_rnn_state = word_rnn_state.add_input(dy.concatenate([ss_expr, zeros_word_rnn]))
+
+    rnn_state = self.fwd_lstm.initial_state()
+    rnn_state = rnn_state.set_s(init_state)
+    zeros_rnn = dy.zeros(self.rule_lstm_input - self.trg_embed_dim)
+    rnn_state = rnn_state.add_input(dy.concatenate([ss_expr, zeros_rnn]))
+
+    self.decoding = decoding
+    if decoding:
+      zeros_lstm = dy.zeros(self.lstm_dim)
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
+          open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
+          prev_word_state=zeros_lstm)
+    else:
+      batch_size = ss_expr.dim()[1]
+      return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \
+          states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
+
+  def add_input(self, tree_dec_state, trg, word_embedder, rule_embedder,
+                trg_rule_vocab=None, word_vocab=None, tag_embedder=None):
+    """Add an input and update the state.
+
+    :param tree_dec_state: An TreeDecoderState object containing the current state.
+    :param trg_embedding: The embedding of the word to input.
+    :param trg: The data list of the target word, with the first element as the word index, the rest as timestep.
+    :param trg_rule_vocab: RuleVocab object used at decoding time
+    :returns: The update MLP decoder state.
+    """
+    word_rnn_state = tree_dec_state.word_rnn_state
+    rnn_state = tree_dec_state.rnn_state
+    if not self.decoding:
+      # get parent states for this batch
+      #batch_size = trg_embedding.dim()[1]
+      #assert batch_size == 1
+      states = tree_dec_state.states
+      paren_tm1_states = tree_dec_state.states[trg.get_col(1)] # ((hidden_dim,), batch_size) * batch_size
+      is_terminal = trg.get_col(3, batched=False)
+      paren_tm1_state = paren_tm1_states[0]
+      if is_terminal[0] == 0:
+        # rule rnn
+        rule_idx = trg.get_col(0)
+        #print trg_rule_vocab[trg.get_col(0, batched=False)[0]]
+        inp = rule_embedder.embed(rule_idx)
+        if self.input_feeding:
+          inp = dy.concatenate([inp, tree_dec_state.context])
+        inp = dy.concatenate([inp, paren_tm1_state, word_rnn_state.output()])
+        if self.feed_word_emb:
+          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
+        rnn_state = rnn_state.add_input(inp)
+        states = np.append(states, rnn_state.output())
+
+        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input-self.lstm_dim),
+        #                                                          rnn_state.output()]))
+      else:
+        # word rnn
+        word_idx = trg.get_col(0)
+        # if this is end of phrase append states list
+        #print word_vocab[trg.get_col(0, batched=False)[0]].encode('utf-8')
+        if word_idx[0] == Vocab.ES:
+          states = np.append(states, rnn_state.output())
+        else:
+          inp = word_embedder.embed(word_idx)
+          emb = inp
+          if self.input_feeding:
+            inp = dy.concatenate([inp, tree_dec_state.word_context])
+          inp = dy.concatenate([inp, paren_tm1_state])
+          word_rnn_state = word_rnn_state.add_input(inp)
+          # update rule RNN
+          if self.update_ruleRNN:
+            if self.feed_word_emb:
+              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                        word_rnn_state.output(), emb])
+            else:
+              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                        word_rnn_state.output()])
+            rnn_state = rnn_state.add_input(rnn_inp)
+
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
+                           states=states)
+    else:
+      #print trg
+      open_nonterms = tree_dec_state.open_nonterms[:]
+      prev_word_state = tree_dec_state.prev_word_state
+      leaf_len = tree_dec_state.leaf_len
+      step_len = tree_dec_state.step_len
+      if open_nonterms[-1].label == u'*':
+        if trg == Vocab.ES:
+          open_nonterms.pop()
+          step_len = -1
+        else:
+          inp = word_embedder.embed(trg)
+          emb = inp
+          if self.input_feeding:
+            inp = dy.concatenate([inp, tree_dec_state.word_context])
+          inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
+          word_rnn_state = word_rnn_state.add_input(inp)
+
+          if self.update_ruleRNN:
+            if self.feed_word_emb:
+              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
+                                        word_rnn_state.output(), emb])
+            else:
+              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                        word_rnn_state.output()])
+            rnn_state = rnn_state.add_input(rnn_inp)
+      else:
+        inp = rule_embedder.embed(trg)
+        if self.input_feeding:
+          inp = dy.concatenate([inp, tree_dec_state.context])
+
+        cur_nonterm = open_nonterms.pop()
+        rule = trg_rule_vocab[trg]
+        if cur_nonterm.label != rule.lhs:
+          for c in cur_nonterm:
+            print c.label
+        assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
+
+        inp = dy.concatenate([inp, cur_nonterm.parent_state, word_rnn_state.output()])
+        if self.feed_word_emb:
+          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
+        rnn_state = rnn_state.add_input(inp)
+        # add rule to tree_dec_state.open_nonterms
+        new_open_nonterms = []
+        for rhs in rule.rhs:
+          if rhs in rule.open_nonterms:
+            new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output()))
+          else:
+            prev_word_state = rnn_state.output()
+        new_open_nonterms.reverse()
+        open_nonterms.extend(new_open_nonterms)
+
+        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
+        #                                                          rnn_state.output()]))
+      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
+                              open_nonterms=open_nonterms, prev_word_state=prev_word_state, leaf_len=leaf_len, step_len=step_len)
+
+  def init_wordRNN(self, tree_dec_state, prev_word_emb=None, paren_t=None):
+    word_rnn_state = tree_dec_state.word_rnn_state
+    rnn_state = tree_dec_state.rnn_state
+    if self.decoding:
+      #inp = tree_dec_state.prev_word_emb
+      inp = prev_word_emb
+      if self.input_feeding:
+        inp = dy.concatenate([inp, tree_dec_state.word_context])
+      # inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state, dy.zeros(self.lstm_dim)])
+      inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
+      word_rnn_state = word_rnn_state.add_input(inp)
+    else:
+      inp = prev_word_emb
+      if self.input_feeding:
+        inp = dy.concatenate([inp, tree_dec_state.word_context])
+      inp = dy.concatenate([inp, tree_dec_state.states[paren_t][0]])
+      word_rnn_state = word_rnn_state.add_input(inp)
+    rnn_state = rnn_state.add_input(dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                                    word_rnn_state.output()]))
+    tree_dec_state.word_rnn_state = word_rnn_state
+    tree_dec_state.rnn_state = rnn_state
+    return tree_dec_state
+
+  def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1, sample_len=False):
+    """Get scores given a current state.
+
+    :param mlp_dec_state: An MlpSoftmaxDecoderState object.
+    :returns: Scores over the vocabulary given this state.
+    """
+    if is_terminal:
+      inp = dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
+                                                                tree_dec_state.rnn_state.output(), tree_dec_state.context])
+      h_t = dy.tanh(self.word_context_projector(inp))
+      if self.action_loss:
+        stop_prob = dy.logistic(self.action_projector(inp))
+        return self.word_vocab_projector(h_t), -1, stop_prob, None
+      elif self.len_loss and sample_len:
+        h_len_t = dy.tanh(self.len_context_projector(inp))
+        len_scores = self.len_projector(h_len_t)
+        return self.word_vocab_projector(h_t), -1, None, len_scores
+      else:
+        return self.word_vocab_projector(h_t), -1, None, None
+    else:
+      if self.rule_cond:
+        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
+                                                                  tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])
+      else:
+        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])
+      h_t = dy.tanh(self.rule_context_projector(inp))
+
+    if label_idx >= 0:
+      # training
+      return self.rule_vocab_projector(h_t), -1, None, None
+      #label = trg_rule_vocab.tag_vocab[label_idx]
+      #valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
+    else:
+      valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
+    if not valid_y_index:
+      print 'warning: no rule with lhs: {}'.format(tree_dec_state.open_nonterms[-1].label)
+      #valid_y_index = [i for i in range(len(trg_rule_vocab))]
+    valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
+    valid_y_mask[valid_y_index] = 0.
+
+    return self.rule_vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index), None, None
+
+  def calc_loss(self, tree_dec_state, ref_action, trg_rule_vocab):
+    ref_word = ref_action.get_col(0)
+    is_terminal = ref_action.get_col(3)[0]
+    is_stop =ref_action.get_col(4)[0]
+    leaf_len = ref_action.get_col(5)[0]
+
+    scores, valid_y_len, stop_prob, len_scores = self.get_scores(tree_dec_state, trg_rule_vocab,
+                                                                 is_terminal, label_idx=1, sample_len=leaf_len>0)
+    # single mode
+    if not xnmt.batcher.is_batched(ref_action):
+      word_loss = dy.pickneglogsoftmax(scores, ref_word)
+    # minibatch mode
+    else:
+      word_loss = dy.pickneglogsoftmax_batch(scores, ref_word)
+    if self.action_loss and is_terminal:
+      if is_stop:
+        word_loss = word_loss - dy.log(stop_prob) * self.action_loss_weight
+      else:
+        word_loss = word_loss - dy.log(1. - stop_prob) * self.action_loss_weight
+      #print is_stop, stop_prob.value()
+    if self.len_loss and is_terminal and leaf_len > 0:
+      if leaf_len > 20: leaf_len = 20
+      word_loss += dy.pickneglogsoftmax(len_scores, leaf_len-1) * self.len_loss_weight
+    return word_loss
+
+  def set_train(self, val):
+    self.fwd_lstm.set_dropout(self.dropout if val else 0.0)
+    if self.set_word_lstm:
+      self.word_lstm.set_dropout(self.dropout if val else 0.0)
+
 class TreeHierDecoder(RnnDecoder, Serializable):
   # TODO: This should probably take a softmax object, which can be normal or class-factored, etc.
   # For now the default behavior is hard coded.
@@ -604,9 +958,6 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         # if this is end of phrase append states list
         if self.action_loss or self.len_loss:
           action = trg.get_col(4)[0]
-          #a_t = dy.tanh(
-          #  self.action_context_projector(dy.concatenate([emb, word_rnn_state.output(), rnn_state.output()])))
-          #a_loss = dy.pickneglogsoftmax(self.action_projector(a_t), action)
           if action == 1:
             states = np.append(states, rnn_state.output())
         else:

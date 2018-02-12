@@ -839,15 +839,17 @@ class Tree(object):
             is_terminal = 1 if len(open_nonterms) == 0 else 0
             if word_vocab and is_terminal:
                 leaf_len = len(node.children)
+                is_first = True
                 for c in node.children:
-                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, 0, leaf_len]
+                    d = [word_vocab.convert(c), paren_t, node.last_word_t, is_terminal, 0, leaf_len, is_first]
                     data.append(d)
                     leaf_len = -1
+                    is_first = False
                 data[-1][4] = 1
             else:
                 d = [rule_vocab.convert(Rule(node.label, children, open_nonterms)), paren_t,
                     node.last_word_t, is_terminal,
-                    rule_vocab.tag_vocab.convert(node.frontir_label), rule_vocab.tag_vocab.convert(node.label)]
+                    rule_vocab.tag_vocab.convert(node.frontir_label), rule_vocab.tag_vocab.convert(node.label), False]
                 data.append(d)
         return data
 

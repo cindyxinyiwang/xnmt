@@ -18,7 +18,7 @@ from xnmt.reports import Reportable
 import xnmt.serializer
 from xnmt.batcher import mark_as_batch, is_batched
 from xnmt.loss import LossBuilder
-from xnmt.decoder import TreeDecoder, TreeHierDecoder
+from xnmt.decoder import TreeDecoder, TreeHierDecoder, TreeHierFixtransDecoder
 
 # Reporting purposes
 from lxml import etree
@@ -208,7 +208,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
           if self.word_attender:
             self.word_attender.init_sent(encodings)
           ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-          if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+          if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder) or isinstance(self.decoder, TreeHierFixtransDecoder):
 
             dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss),
                                                    decoding=True)
@@ -232,7 +232,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         if self.word_attender:
           self.word_attender.init_sent(encodings)
         ss = mark_as_batch([Vocab.SS] * len(src)) if is_batched(src) else Vocab.SS
-        if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder):
+        if isinstance(self.decoder, TreeDecoder) or isinstance(self.decoder, TreeHierDecoder) or isinstance(self.decoder, TreeHierFixtransDecoder):
           dec_state = self.decoder.initial_state(self.encoder.get_final_states(), self.trg_embedder.embed(ss),
                                                  decoding=True)
         else:

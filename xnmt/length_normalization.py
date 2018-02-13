@@ -118,10 +118,12 @@ class GaussianNormalization(LengthNormalization, Serializable):
    refer: https://arxiv.org/pdf/1509.04942.pdf
   '''
   yaml_tag = u'!GaussianNormalization'
-  def __init__(self, sent_stats):
+  def __init__(self, sent_stats, m=1., apply_during_search=True):
     self.stats = sent_stats.trg_stat
     self.num_sent = sent_stats.num_pair
     self.fit_distribution()
+    self.m = m
+    self.apply_during_search = apply_during_search
 
   def fit_distribution(self):
     y = np.zeros(self.num_sent)
@@ -139,3 +141,9 @@ class GaussianNormalization(LengthNormalization, Serializable):
   def normalize_completed(self, completed_hyps, src_length=None):
     for hyp in completed_hyps:
       hyp.score /= self.trg_length_prob(len(hyp.id_list))
+
+  def normalize_partial(self, score_so_far, score_to_add, new_len):
+    if self.apply_during_search:
+      return (score_so_far * pow(new_len-1, self.m) + score_to_add) / pow(new_len, self.m)
+    else:
+      return score_so_far + score_to_add

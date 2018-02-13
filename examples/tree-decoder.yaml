@@ -1,0 +1,69 @@
+defaults:
+  experiment:
+    model_file: examples/output/<EXP>.mod
+    hyp_file: examples/output/<EXP>.hyp
+    out_file: examples/output/<EXP>.out
+    err_file: examples/output/<EXP>.err
+    cfg_file: examples/output/<EXP>.yaml
+    run_for_epochs: 20
+    eval_metrics: bleu
+  train:
+    batcher: !SrcBatcher
+      batch_size: 1
+    dropout: 0.1
+    default_layer_dim: 20
+    restart_trainer: True
+    trainer: Adam
+    learning_rate: 0.0002
+    lr_decay: 0.5
+    dev_metrics: bleu
+    #training_strategy: !TrainingTreeLoss {}
+    #dev_every: 1
+    training_corpus: !BilingualTrainingCorpus
+      train_src: examples/data/dev-head5.piece.ja
+      train_trg: examples/data/dev-head5.parse.en,examples/data/dev-head5.piece.en
+      train_len_file: examples/data/dev-head5.en
+      dev_src: examples/data/dev-head5.piece.ja
+      dev_trg: examples/data/dev-head5.parse.en,examples/data/dev-head5.piece.en
+      dev_ref_file: examples/data/dev-head5.en
+      dev_len_file: examples/data/dev-head5.en
+    corpus_parser: !BilingualCorpusParser
+      src_reader: !PlainTextReader {}
+      trg_reader: !TreeReader
+        del_preterm_POS: True
+        read_word: True
+        binarize: False
+        #merge_level: 4
+        add_eos: True
+    #model: !TreeTranslator
+    model: !DefaultTranslator
+      src_embedder: !SimpleWordEmbedder {}
+      encoder: !LSTMSeqTransducer
+        layers: 1
+      attender: !StandardAttender {}
+      word_attender: !StandardAttender {}
+      trg_embedder: !SimpleWordEmbedder {}
+      word_embedder: !SimpleWordEmbedder {}
+      #decoder: !TreeHierFixtransDecoder
+      decoder: !TreeHierDecoder
+        layers: 1
+        mlp_hidden_dim: 512
+        bridge: !CopyBridge {}
+        #feed_word_emb: False
+        #action_loss_weight: 0.9
+        #len_loss_weight: 1.
+      #loop_trg: True
+  decode:
+    #sample_num: 2
+    beam: 1
+    #output_beam: 5
+    post_process: rule-piece-wordswitch
+    #post_process: rule-piece
+    len_norm_type: !GaussianNormalization
+      apply_during_search: true
+      m: 1.
+    src_file: examples/data/test.ja
+  evaluate:
+    ref_file: examples/data/test.en
+
+tree-decoder:

@@ -114,7 +114,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     if kwargs.get("len_norm_type", None) is None:
       len_norm = xnmt.length_normalization.NoNormalization()
     else:
-      if type(kwargs["len_norm_type"]) == MultinomialNormalization:
+      if type(kwargs["len_norm_type"]) == MultinomialNormalization or type(kwargs["len_norm_type"]) == GaussianNormalization:
         len_norm_args = kwargs["len_norm_type"]
         sent_stats = SentenceStats()
         sent_stats.populate_statistics(train_src, train_trg)
@@ -137,6 +137,7 @@ class DefaultTranslator(Translator, Serializable, Reportable):
       else:
         search_args["beam_size"] = kwargs.get("beam", 1)
         search_args["len_norm"] = len_norm
+        print(type(len_norm))
         self.search_strategy = BeamSearch(**search_args)
         if kwargs.get("output_beam", 0) > 0:
           self.output_beam = kwargs["output_beam"]

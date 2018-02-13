@@ -259,6 +259,7 @@ class XnmtTrainer(object):
         eos_loss_builder.add_loss("word_eos_loss", word_eos_losses)
 
         loss_value = loss_builder.compute()
+        #print(loss_value.value())
         rule_loss_value = rule_loss_builder.compute()
         word_loss_value = word_loss_builder.compute()
         eos_loss_value = eos_loss_builder.compute()
@@ -278,7 +279,6 @@ class XnmtTrainer(object):
             loss_builder.add_loss(loss_name, loss_expr)
             loss = loss_expr if not loss else loss + loss_expr
           standard_loss = loss
-
         else:
           loss_builder.add_loss("loss", standard_loss)
 
@@ -289,6 +289,7 @@ class XnmtTrainer(object):
         # Log the loss sum
         #print(standard_loss.dim())
         loss_value = loss_builder.compute()
+        #print(loss_value.value())
         if self.training_corpus.train_len_file:
           self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
         else:
@@ -326,7 +327,7 @@ class XnmtTrainer(object):
         self.decode_args.trg_file = out_file
       # Decoding + post_processing
       xnmt.xnmt_decode.xnmt_decode(self.decode_args, model_elements=(self.corpus_parser, self.model),
-                                   train_src=self.train_src, train_trg=self.train_trg)
+                                   train_src=self.training_corpus.train_src_data, train_trg=self.training_corpus.train_trg_data)
       output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
       # Copy Trg to Ref
       processed = []

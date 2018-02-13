@@ -217,9 +217,12 @@ class BeamSearch(SearchStrategy):
             new_list.append(cur_id)
           if trg_rule_vocab:
             if score[cur_id] == -np.inf: continue
-            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state.copy()))
+            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list), src_length=src_length),
+                                           new_list, dec_state.copy()))
           else:
-            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list)), new_list, dec_state))
+            new_set.append(self.Hypothesis(self.len_norm.normalize_partial(hyp.score, score[cur_id], len(new_list), src_length=src_length),
+                                           new_list, dec_state))
+
       length += 1
       
       if trg_rule_vocab and num_valid_rule >= 0:

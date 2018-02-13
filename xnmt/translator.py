@@ -114,12 +114,19 @@ class DefaultTranslator(Translator, Serializable, Reportable):
     if kwargs.get("len_norm_type", None) is None:
       len_norm = xnmt.length_normalization.NoNormalization()
     else:
-      if type(kwargs["len_norm_type"]) == MultinomialNormalization or type(kwargs["len_norm_type"]) == GaussianNormalization:
+      if type(kwargs["len_norm_type"]) == MultinomialNormalization:
         len_norm_args = kwargs["len_norm_type"]
         sent_stats = SentenceStats()
         sent_stats.populate_statistics(train_src, train_trg)
         len_norm = MultinomialNormalization(sent_stats, m=len_norm_args.m,
                                             apply_during_search=len_norm_args.apply_during_search)
+      elif type(kwargs["len_norm_type"]) == GaussianNormalization:
+        len_norm_args = kwargs["len_norm_type"]
+        sent_stats = SentenceStats()
+        sent_stats.populate_statistics(train_src, train_trg)
+        len_norm = GaussianNormalization(sent_stats,
+                                            apply_during_search=len_norm_args.apply_during_search,
+                                            length_ratio=len_norm_args.length_ratio)
       else:
         len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
     search_args = {}

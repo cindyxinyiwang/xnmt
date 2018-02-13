@@ -17,7 +17,7 @@ class LengthNormalization(object):
     :returns: None
     """
     raise NotImplementedError('normalize_completed must be implemented in LengthNormalization subclasses')
-  def normalize_partial(self, score_so_far, score_to_add, new_len):
+  def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
     """
     :param score_so_far:
     :param score_to_add:
@@ -50,7 +50,8 @@ class AdditiveNormalization(LengthNormalization, Serializable):
     if not self.apply_during_search:
       for hyp in completed_hyps:
         hyp.score += (len(hyp.id_list) * self.penalty)
-  def normalize_partial(self, score_so_far, score_to_add, new_len):
+
+  def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
     return score_so_far + score_to_add + (self.penalty if self.apply_during_search else 0.0)
 
 
@@ -68,7 +69,7 @@ class PolynomialNormalization(LengthNormalization, Serializable):
     if not self.apply_during_search:
       for hyp in completed_hyps:
         hyp.score /= pow(len(hyp.id_list), self.m)
-  def normalize_partial(self, score_so_far, score_to_add, new_len):
+  def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
     if self.apply_during_search:
       return (score_so_far * pow(new_len-1, self.m) + score_to_add) / pow(new_len, self.m)
     else:
@@ -88,26 +89,27 @@ class MultinomialNormalization(LengthNormalization, Serializable):
     self.m = m
     self.apply_during_search = apply_during_search
 
-  def normalize_partial(self, score_so_far, score_to_add, new_len):
-    if self.apply_during_search:
-      return (score_so_far * pow(new_len-1, self.m) + score_to_add) / pow(new_len, self.m)
-    else:
-      return score_so_far + score_to_add
-
-  def trg_length_prob(self, src_length, trg_length):
+  def trg_length_log_prob(self, src_length, trg_length):
+    assert (src_length is not None), "Length of Source Sentence is required in MultinomialNormalization when length_ratio=True"
     v = len(self.stats.src_stat)
     if src_length in self.stats.src_stat:
       src_stat = self.stats.src_stat.get(src_length)
-      return (src_stat.trg_len_distribution.get(trg_length, 0) + 1) / (src_stat.num_sents + v)
-    return 1
+      return np.log((src_stat.trg_len_distribution.get(trg_length, 0) + 1) / (src_stat.num_sents + v))
+    return 0
+
+  def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
+    if self.apply_during_search:
+      return score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len) - self.trg_length_log_prob(src_length, new_len-1)
+    else:
+      return score_so_far + score_to_add
 
   def normalize_completed(self, completed_hyps, src_length=None):
     """
     :type src_length: length of the src sent
     """
-    assert (src_length is not None), "Length of Source Sentence is required"
-    for hyp in completed_hyps:
-      hyp.score += np.log(self.trg_length_prob(src_length, len(hyp.id_list)))
+    if not self.apply_during_search:
+      for hyp in completed_hyps:
+        hyp.score += self.trg_length_log_prob(src_length, len(hyp.id_list))
 
 
 class GaussianNormalization(LengthNormalization, Serializable):
@@ -116,34 +118,49 @@ class GaussianNormalization(LengthNormalization, Serializable):
    to select sents that have similar lengths as the
    sents in the training set.
    refer: https://arxiv.org/pdf/1509.04942.pdf
+
+   Optionally, instead of fitting the average length, fit the length ratio len(trg)/len(src).
   '''
   yaml_tag = u'!GaussianNormalization'
-  def __init__(self, sent_stats, m=1., apply_during_search=True):
-    self.stats = sent_stats.trg_stat
-    self.num_sent = sent_stats.num_pair
+  def __init__(self, sent_stats, m=1., apply_during_search=True, length_ratio=False):
+    self.sent_stats = sent_stats
     self.fit_distribution()
     self.m = m
     self.apply_during_search = apply_during_search
+    self.length_ratio = length_ratio
 
   def fit_distribution(self):
-    y = np.zeros(self.num_sent)
-    iter = 0
-    for key in self.stats:
-      iter_end = self.stats[key].num_sents + iter
-      y[iter:iter_end] = key
-      iter = iter_end
-    mu, std = norm.fit(y)
-    self.distr = norm(mu, std)
+    if self.length_ratio:
+      raise NotImplementedError('Fitting distributions for length ratios in GaussianNormalization not implemented yet')
+    else:
+      stats = self.sent_stats.trg_stat
+      num_sent = self.sent_stats.num_pair
+      y = np.zeros(self.num_sent)
+      iter = 0
+      for key in stats:
+        iter_end = stats[key].num_sents + iter
+        y[iter:iter_end] = key
+        iter = iter_end
+      mu, std = norm.fit(y)
+      self.distr = norm(mu, std)
 
-  def trg_length_prob(self, trg_length):
-    return self.distr.pdf(trg_length)
+  def trg_length_log_prob(self, src_length, trg_length):
+    assert (src_length is not None), "Length of Source Sentence is required in GaussianNormalization when length_ratio=True"
+    if self.length_ratio():
+      return np.log(self.distr.pdf(trg_length/src_length))
+    else:
+      return np.log(self.distr.pdf(trg_length))
 
-  def normalize_completed(self, completed_hyps, src_length=None):
-    for hyp in completed_hyps:
-      hyp.score /= self.trg_length_prob(len(hyp.id_list))
-
-  def normalize_partial(self, score_so_far, score_to_add, new_len):
+  def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
     if self.apply_during_search:
-      return (score_so_far * pow(new_len-1, self.m) + score_to_add) / pow(new_len, self.m)
+      return score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len) - self.trg_length_log_prob(src_length, new_len-1)
     else:
       return score_so_far + score_to_add
+
+  def normalize_completed(self, completed_hyps, src_length=None):
+    """
+    :type src_length: length of the src sent
+    """
+    if not self.apply_during_search:
+      for hyp in completed_hyps:
+        hyp.score += self.trg_length_log_prob(src_length, len(hyp.id_list))

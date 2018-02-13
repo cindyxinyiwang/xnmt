@@ -90,7 +90,7 @@ class MultinomialNormalization(LengthNormalization, Serializable):
     self.apply_during_search = apply_during_search
 
   def trg_length_log_prob(self, src_length, trg_length):
-    assert (src_length is not None), "Length of Source Sentence is required in MultinomialNormalization when length_ratio=True"
+    assert (src_length is not None), "Length of Source Sentence is required in MultinomialNormalization"
     v = len(self.stats.src_stat)
     if src_length in self.stats.src_stat:
       src_stat = self.stats.src_stat.get(src_length)
@@ -146,7 +146,7 @@ class GaussianNormalization(LengthNormalization, Serializable):
 
   def trg_length_log_prob(self, src_length, trg_length):
     assert (src_length is not None), "Length of Source Sentence is required in GaussianNormalization when length_ratio=True"
-    if self.length_ratio():
+    if self.length_ratio:
       return np.log(self.distr.pdf(trg_length/src_length))
     else:
       return np.log(self.distr.pdf(trg_length))

@@ -5,6 +5,7 @@ import argparse
 import sys
 import six
 from subprocess import Popen
+from translator import *
 
 import dynet as dy
 
@@ -125,7 +126,7 @@ class XnmtTrainer(object):
     if args.src_format == "contvec":
       self.batcher.pad_token = np.zeros(self.model.src_embedder.emb_dim)
     self.pack_batches()
-    if isinstance(self.model.decoder, TreeDecoder):
+    if isinstance(self.model, TreeTranslator):
       self.logger = BatchTreeLossTracker(args.dev_every, self.total_train_sent)
     else:
       self.logger = BatchLossTracker(args.dev_every, self.total_train_sent)
@@ -243,44 +244,76 @@ class XnmtTrainer(object):
         standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab, self.corpus_parser.trg_reader.word_vocab)
       else:
         standard_loss = self.model.calc_loss(src, trg, self.corpus_parser.trg_reader.vocab)
-      #print(src)
-      if standard_loss.__class__ == LossBuilder:
-        loss = None
-        for loss_name, loss_expr in standard_loss.loss_nodes:
-          loss_builder.add_loss(loss_name, loss_expr)
-          loss = loss_expr if not loss else loss + loss_expr
-        standard_loss = loss
+      if type(self.logger) == BatchTreeLossTracker:
+        rule_loss_builder = LossBuilder()
+        word_loss_builder = LossBuilder()
+        eos_loss_builder = LossBuilder()
+        rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count = standard_loss
 
+        loss_builder.add_loss("loss", rule_losses)
+        loss_builder.add_loss("loss", word_losses)
+        loss_builder.add_loss("loss", word_eos_losses)
+
+        rule_loss_builder.add_loss("rule_loss", rule_losses)
+        word_loss_builder.add_loss("word_loss", word_losses)
+        eos_loss_builder.add_loss("word_eos_loss", word_eos_losses)
+
+        loss_value = loss_builder.compute()
+        rule_loss_value = rule_loss_builder.compute()
+        word_loss_value = word_loss_builder.compute()
+        eos_loss_value = eos_loss_builder.compute()
+        if update_weights:
+          loss_value.backward()
+          self.trainer.update()
+
+        self.logger.update_epoch_loss(src, trg, rule_loss_builder, word_loss_builder, eos_loss_builder, rule_count, word_count, word_eos_count)
+        self.logger.report_train_process()
+        if self.logger.should_report_dev():
+          self.dev_evaluation()
       else:
-        loss_builder.add_loss("loss", standard_loss)
+        #print(src)
+        if standard_loss.__class__ == LossBuilder:
+          loss = None
+          for loss_name, loss_expr in standard_loss.loss_nodes:
+            loss_builder.add_loss(loss_name, loss_expr)
+            loss = loss_expr if not loss else loss + loss_expr
+          standard_loss = loss
 
-      additional_loss = self.model.calc_additional_loss(dy.nobackprop(-standard_loss))
-      if additional_loss != None:
-        loss_builder.add_loss("additional_loss", additional_loss)
+        else:
+          loss_builder.add_loss("loss", standard_loss)
 
-      # Log the loss sum
-      #print(standard_loss.dim())
-      loss_value = loss_builder.compute()
-      if self.training_corpus.train_len_file:
-        self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
-      else:
-        self.logger.update_epoch_loss(src, trg, loss_builder)
-      if update_weights:
-        loss_value.backward()
-        self.trainer.update()
+        additional_loss = self.model.calc_additional_loss(dy.nobackprop(-standard_loss))
+        if additional_loss != None:
+          loss_builder.add_loss("additional_loss", additional_loss)
+
+        # Log the loss sum
+        #print(standard_loss.dim())
+        loss_value = loss_builder.compute()
+        if self.training_corpus.train_len_file:
+          self.logger.update_epoch_loss(src, trg, loss_builder, self.train_trg_len[batch_num])
+        else:
+          self.logger.update_epoch_loss(src, trg, loss_builder)
+        if update_weights:
+          loss_value.backward()
+          self.trainer.update()
       
-      # Devel reporting
-      self.logger.report_train_process()
-      #print(loss_value.dim())
-      if self.logger.should_report_dev():
-        self.dev_evaluation()
+        # Devel reporting
+        self.logger.report_train_process()
+        #print(loss_value.dim())
+        if self.logger.should_report_dev():
+          self.dev_evaluation()
 
-      self.model.new_epoch()
+    self.model.new_epoch()
 
   def dev_evaluation(self, out_ext=".dev_hyp", ref_ext=".dev_ref", encoding='utf-8'):
     self.model.set_train(False)
     self.logger.new_dev()
-    trg_words_cnt, loss_score = self.compute_dev_loss()
+    if type(self.logger) == BatchTreeLossTracker:
+      rule_count, word_count, word_eos_count, rule_losses, word_losses, word_eos_losses, loss_score \
+       = self.compute_dev_tree_loss()
+      trg_words_cnt = word_count
+    else:
+      trg_words_cnt, loss_score = self.compute_dev_loss()
     schedule_metric = self.args.schedule_metric.lower()
 
     eval_scores = {"loss" : loss_score}
@@ -292,7 +325,8 @@ class XnmtTrainer(object):
         out_file_ref = self.args.model_file + ref_ext
         self.decode_args.trg_file = out_file
       # Decoding + post_processing
-      xnmt.xnmt_decode.xnmt_decode(self.decode_args, model_elements=(self.corpus_parser, self.model))
+      xnmt.xnmt_decode.xnmt_decode(self.decode_args, model_elements=(self.corpus_parser, self.model),
+                                   train_src=self.train_src, train_trg=self.train_trg)
       output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
       # Copy Trg to Ref
       processed = []
@@ -326,9 +360,13 @@ class XnmtTrainer(object):
 
     print("> Checkpoint")
     # print previously computed metrics
+    if type(self.logger) == BatchTreeLossTracker:
+      self.logger.report_tree_score(rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count, loss_score)
+
     for metric in self.evaluators:
       if metric != schedule_metric:
         self.logger.report_auxiliary_score(eval_scores[metric])
+
     # Write out the model if it's the best one
     if self.logger.report_dev_and_check_model(self.args.model_file):
       if self.args.model_file is not None:
@@ -354,6 +392,34 @@ class XnmtTrainer(object):
 
     self.model.set_train(True)
     return
+
+  def compute_dev_tree_loss(self):
+    word_loss_builder = LossBuilder()
+    rule_loss_builder = LossBuilder()
+    eos_loss_builder = LossBuilder()
+    loss_builder = LossBuilder()
+    word_cnt, rule_cnt, eos_cnt = 0, 0, 0
+    for i in range(len(self.dev_src)):
+      dy.renew_cg()
+      rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count \
+        = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
+      word_loss_builder.add_loss("word_loss", word_losses)
+      rule_loss_builder.add_loss("rule_loss", rule_losses)
+      eos_loss_builder.add_loss("eos_loss", word_eos_losses)
+
+      word_cnt += word_count
+      rule_cnt += rule_count
+      eos_cnt += word_eos_count
+
+      loss_builder.add_loss("word_loss", word_losses)
+      loss_builder.add_loss("rule_loss", rule_losses)
+      loss_builder.add_loss("eos_loss", word_eos_losses)
+      loss_builder.compute()
+
+      word_loss_value = word_loss_builder.compute()
+      rule_loss_value = rule_loss_builder.compute()
+      eos_loss_value = eos_loss_builder.compute()
+    return rule_cnt, word_cnt, eos_cnt, rule_loss_builder.sum() / rule_cnt, word_loss_builder.sum() / word_cnt, eos_loss_builder.sum() / eos_cnt, LossScore(loss_builder.sum() / word_cnt)
 
   def compute_dev_loss(self):
     loss_builder = LossBuilder()

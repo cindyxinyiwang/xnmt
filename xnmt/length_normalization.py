@@ -83,8 +83,16 @@ class MultinomialNormalization(LengthNormalization, Serializable):
   '''
   yaml_tag = u'!MultinomialNormalization'
 
-  def __init__(self, sent_stats):
+  def __init__(self, sent_stats, m=1, apply_during_search=True):
     self.stats = sent_stats
+    self.m = m
+    self.apply_during_search = apply_during_search
+
+  def normalize_partial(self, score_so_far, score_to_add, new_len):
+    if self.apply_during_search:
+      return (score_so_far * pow(new_len-1, self.m) + score_to_add) / pow(new_len, self.m)
+    else:
+      return score_so_far + score_to_add
 
   def trg_length_prob(self, src_length, trg_length):
     v = len(self.stats.src_stat)

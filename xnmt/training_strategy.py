@@ -88,9 +88,12 @@ class TrainingTreeLoss(Serializable):
 
   def __call__(self, translator, dec_state, src, trg, pick_src_elem=-1, trg_rule_vocab=None, word_vocab=None):
     trg_mask = trg.mask if xnmt.batcher.is_batched(trg) else None
-    losses = []
+    rule_losses = []
+    word_losses = []
+    word_eos_losses = []
+    rule_count, word_count, word_eos_count = 0, 0, 0
     seq_len = len(trg[0]) if xnmt.batcher.is_batched(src) else len(trg)
-    trg_is_list = type(trg[0][0]) == list
+
     if xnmt.batcher.is_batched(src):
       for j, single_trg in enumerate(trg):
         assert len(single_trg) == seq_len  # assert consistent length
@@ -106,25 +109,31 @@ class TrainingTreeLoss(Serializable):
         dec_state.word_context = translator.word_attender.calc_context(dec_state.word_rnn_state.output(),
                                                                        pick_src_elem)
       word_loss = translator.decoder.calc_loss(dec_state, ref_word, trg_rule_vocab)
-
+      is_terminal = ref_word.get_col(3)[0]
       if xnmt.batcher.is_batched(src) and trg_mask is not None:
         word_loss = trg_mask.cmult_by_timestep_expr(word_loss, i, inverse=True)
-      losses.append(word_loss)
-      #if i < seq_len - 1:
-      if i < seq_len:
+      if is_terminal:
+        if ref_word.get_col(0)[0] == Vocab.ES:
+          word_eos_losses.append(word_loss)
+          word_eos_count += 1
+        else:
+          word_losses.append(word_loss)
+          word_count += 1
+      else:
+        rule_losses.append(word_loss)
+        rule_count += 1
+      if i < seq_len - 1:
         word = ref_word.get_col(0) if type(ref_word[0]) == list else ref_word
         if translator.word_embedder:
           dec_state = translator.decoder.add_input(dec_state, ref_word, word_embedder=translator.word_embedder,
                                                    rule_embedder=translator.trg_embedder,
                                                    trg_rule_vocab=trg_rule_vocab,
-                                                   tag_embedder=translator.tag_embedder,
                                                    word_vocab=word_vocab)
         else:
           dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word),
                                                    ref_word,
-                                                   trg_rule_vocab=trg_rule_vocab,
-                                                   tag_embedder=translator.tag_embedder)
-    return dy.esum(losses)
+                                                   trg_rule_vocab=trg_rule_vocab)
+    return dy.esum(rule_losses), dy.esum(word_losses), dy.esum(word_eos_losses), rule_count, word_count, word_eos_count
 
 class TrainingReinforceLoss(Serializable):
   yaml_tag = '!TrainingReinforceLoss'

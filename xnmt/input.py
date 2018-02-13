@@ -1011,10 +1011,19 @@ def add_preterminal_wordswitch(root, add_eos):
 def remove_preterminal_POS(root):
     ''' Remove the POS tag before terminal '''
     for i, c in enumerate(root.children):
+
         if c.is_preterminal():
             root.children[i] = c.children[0]
         else:
             remove_preterminal_POS(c)
+
+def replace_POS(root):
+    ''' simply replace POS with * '''
+    for i, c in enumerate(root.children):
+        if c.is_preterminal():
+            c.label = '*'
+        else:
+            replace_POS(c)
 
 def merge_depth(root, max_depth, cur_depth):
     ''' raise up trees whose depth exceed max_depth '''
@@ -1182,31 +1191,33 @@ if __name__ == "__main__":
     '''
 
 
-    #train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-trainunfilt.tok.parse.eng"
-    #train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-trainunfilt.tok.piece.eng"
-    train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowparse.en"
-    train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowpiece.en"
+    train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.parse.eng"
+    train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.piece.eng"
+    #train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowparse.en"
+    #train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowpiece.en"
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
     word_vocab = Vocab()
-    '''
+
     leaf_lens = defaultdict(int)
     for parse, piece in zip(parse_fp, piece_fp):
         t = Tree(parse_root(tokenize(parse)))
-        remove_preterminal_POS(t.root)
+        #remove_preterminal_POS(t.root)
+        replace_POS(t.root)
         #t.root = right_binarize(t.root)
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
         #merge_depth(t.root, 5, 0)
-        merge_tags(t.root)
-        add_preterminal_wordswitch(t.root, add_eos=False)
-        t.reset_timestep()
-        t.root.get_leaf_lens(leaf_lens)
+        #merge_tags(t.root)
+        #add_preterminal_wordswitch(t.root, add_eos=False)
+        #t.reset_timestep()
+        #t.root.get_leaf_lens(leaf_lens)
         #t.get_data_root(rule_vocab)
-        #print t.to_parse_string().encode('utf-8')
+        print t.to_parse_string().encode('utf-8')
+    '''
     for w in sorted(leaf_lens, key=leaf_lens.get, reverse=True):
         print 'len', w, 'count', leaf_lens[w]
-    '''
+    
     s = u"(root (s (np (fw i)) (vp (vbp like) (np (prp$ my) (nn steak) (nn medium))) (. .)) )"
     piece = u"\u2581i \u2581like \u2581my \u2581st eak \u2581medium \u2581."
     #s = u"(ROOT (S (NP (FW i)) (VP (VBD heard) (SBAR (IN that) (S (NP (PRP he)) (VP (VBD gave) (NP (PRP himself)) (PRT (RP up)) (PP (TO to) (NP (DT the) (NN police))))))) (. .)) )"
@@ -1233,7 +1244,7 @@ if __name__ == "__main__":
     #print len(idx_list)
     #print rule_vocab[idx_list[0]]
     print 'vocab size: ', len(rule_vocab)
-
+    '''
 
 ###### Obsolete Functions
 

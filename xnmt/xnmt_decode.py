@@ -41,7 +41,7 @@ options = [
 
 NO_DECODING_ATTEMPTED = u"@@NO_DECODING_ATTEMPTED@@"
 
-def xnmt_decode(args, model_elements=None):
+def xnmt_decode(args, model_elements=None, train_src=None, train_trg=None):
   """
   :param model_elements: If None, the model will be loaded from args.model_file. If set, should
   equal (corpus_parser, generator).
@@ -79,7 +79,7 @@ def xnmt_decode(args, model_elements=None):
   word_vocab = corpus_parser.trg_reader.word_vocab if hasattr(corpus_parser.trg_reader, "word_vocab") else None
   # Perform initialization
   generator.set_train(False)
-  generator.initialize_generator(**args.params_as_dict)
+  generator.initialize_generator(train_src, train_trg, **args.params_as_dict)
   sampling = args.sample_num >=0
   output_beam = args.output_beam
   # TODO: Structure it better. not only Translator can have post processes

@@ -415,25 +415,13 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
   def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1, rule_cond=True,
-               update_ruleRNN=True):
+               bridge=None, start_nonterm='ROOT'):
 
     register_handler(self)
     self.set_word_lstm = True
     param_col = yaml_context.dynet_param_collection.param_col
     self.start_nonterm = start_nonterm
-    self.feed_word_emb = feed_word_emb
-    self.update_ruleRNN = update_ruleRNN
-    if action_loss_weight > 0:
-      self.action_loss = True
-      self.action_loss_weight = action_loss_weight
-    else:
-      self.action_loss = False
-    if len_loss_weight > 0:
-      self.len_loss = True
-      self.len_loss_weight = len_loss_weight
-    else:
-      self.len_loss = False
+
     # Define dim
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
@@ -453,8 +441,6 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
 
     # parent state + wordRNN output
     rule_lstm_input += lstm_dim*2
-    if self.feed_word_emb:
-      rule_lstm_input += trg_embed_dim
     # ruleRNN output
     word_lstm_input += lstm_dim
 
@@ -479,12 +465,7 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
                                               model = param_col,
                                               residual_to_output = residual_to_output)
     # MLP
-    self.rule_cond = rule_cond
-    if rule_cond:
-      rule_input = 2*input_dim + 2*lstm_dim
-    else:
-      rule_input = input_dim + lstm_dim
-    self.rule_context_projector = xnmt.linear.Linear(input_dim=rule_input,
+    self.rule_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
     self.word_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
@@ -496,20 +477,7 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
     self.word_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
                                          output_dim = word_vocab_size,
                                          model = param_col)
-    if self.action_loss:
-      #self.action_context_projector = xnmt.linear.Linear(input_dim=2*lstm_dim+trg_embed_dim,
-      #                                                output_dim=mlp_hidden_dim,
-      #                                                model=param_col)
-      self.action_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
-                                                 output_dim=1,
-                                                 model=param_col)
-    if self.len_loss:
-      self.len_context_projector = xnmt.linear.Linear(input_dim=2*lstm_dim+2*input_dim,
-                                                      output_dim=mlp_hidden_dim,
-                                                      model=param_col)
-      self.len_projector = xnmt.linear.Linear(input_dim=mlp_hidden_dim,
-                                              output_dim=25,
-                                              model=param_col)
+
     # Dropout
     self.dropout = dropout or yaml_context.dropout
 
@@ -574,13 +542,9 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.context])
         inp = dy.concatenate([inp, paren_tm1_state, word_rnn_state.output()])
-        if self.feed_word_emb:
-          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
+
         rnn_state = rnn_state.add_input(inp)
         states = np.append(states, rnn_state.output())
-
-        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input-self.lstm_dim),
-        #                                                          rnn_state.output()]))
       else:
         # word rnn
         word_idx = trg.get_col(0)
@@ -596,27 +560,18 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
           inp = dy.concatenate([inp, paren_tm1_state])
           word_rnn_state = word_rnn_state.add_input(inp)
           # update rule RNN
-          if self.update_ruleRNN:
-            if self.feed_word_emb:
-              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
-                                        word_rnn_state.output(), emb])
-            else:
-              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                         word_rnn_state.output()])
-            rnn_state = rnn_state.add_input(rnn_inp)
-
+          rnn_state = rnn_state.add_input(rnn_inp)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
     else:
       #print trg
       open_nonterms = tree_dec_state.open_nonterms[:]
       prev_word_state = tree_dec_state.prev_word_state
-      leaf_len = tree_dec_state.leaf_len
-      step_len = tree_dec_state.step_len
       if open_nonterms[-1].label == u'*':
         if trg == Vocab.ES:
           open_nonterms.pop()
-          step_len = -1
         else:
           inp = word_embedder.embed(trg)
           emb = inp
@@ -625,14 +580,9 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
           inp = dy.concatenate([inp, tree_dec_state.open_nonterms[-1].parent_state])
           word_rnn_state = word_rnn_state.add_input(inp)
 
-          if self.update_ruleRNN:
-            if self.feed_word_emb:
-              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim-self.trg_embed_dim),
-                                        word_rnn_state.output(), emb])
-            else:
-              rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
-                                        word_rnn_state.output()])
-            rnn_state = rnn_state.add_input(rnn_inp)
+          rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
+                                     word_rnn_state.output()])
+          rnn_state = rnn_state.add_input(rnn_inp)
       else:
         inp = rule_embedder.embed(trg)
         if self.input_feeding:
@@ -646,8 +596,6 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
         assert cur_nonterm.label == rule.lhs, "the lhs of the current input rule %s does not match the next open nonterminal %s" % (rule.lhs, cur_nonterm.label)
 
         inp = dy.concatenate([inp, cur_nonterm.parent_state, word_rnn_state.output()])
-        if self.feed_word_emb:
-          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
         rnn_state = rnn_state.add_input(inp)
         # add rule to tree_dec_state.open_nonterms
         new_open_nonterms = []
@@ -658,11 +606,8 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
             prev_word_state = rnn_state.output()
         new_open_nonterms.reverse()
         open_nonterms.extend(new_open_nonterms)
-
-        #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
-        #                                                          rnn_state.output()]))
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
-                              open_nonterms=open_nonterms, prev_word_state=prev_word_state, leaf_len=leaf_len, step_len=step_len)
+                              open_nonterms=open_nonterms, prev_word_state=prev_word_state)
 
   def init_wordRNN(self, tree_dec_state, prev_word_emb=None, paren_t=None):
     word_rnn_state = tree_dec_state.word_rnn_state
@@ -687,7 +632,7 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
     tree_dec_state.rnn_state = rnn_state
     return tree_dec_state
 
-  def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1, sample_len=False):
+  def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1, sample_len=None):
     """Get scores given a current state.
 
     :param mlp_dec_state: An MlpSoftmaxDecoderState object.
@@ -697,23 +642,11 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
       inp = dy.concatenate([tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context,
                                                                 tree_dec_state.rnn_state.output(), tree_dec_state.context])
       h_t = dy.tanh(self.word_context_projector(inp))
-      if self.action_loss:
-        stop_prob = dy.logistic(self.action_projector(inp))
-        return self.word_vocab_projector(h_t), -1, stop_prob, None
-      elif self.len_loss and sample_len:
-        h_len_t = dy.tanh(self.len_context_projector(inp))
-        len_scores = self.len_projector(h_len_t)
-        return self.word_vocab_projector(h_t), -1, None, len_scores
-      else:
-        return self.word_vocab_projector(h_t), -1, None, None
+      return self.word_vocab_projector(h_t), -1, None, None
     else:
-      if self.rule_cond:
-        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
-                                                                  tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])
-      else:
-        inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])
+      inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context,
+                                                              tree_dec_state.word_rnn_state.output(), tree_dec_state.word_context])
       h_t = dy.tanh(self.rule_context_projector(inp))
-
     if label_idx >= 0:
       # training
       return self.rule_vocab_projector(h_t), -1, None, None
@@ -736,22 +669,13 @@ class TreeHierFixtransDecoder(RnnDecoder, Serializable):
     leaf_len = ref_action.get_col(5)[0]
 
     scores, valid_y_len, stop_prob, len_scores = self.get_scores(tree_dec_state, trg_rule_vocab,
-                                                                 is_terminal, label_idx=1, sample_len=leaf_len>0)
+                                                                 is_terminal, label_idx=1)
     # single mode
     if not xnmt.batcher.is_batched(ref_action):
       word_loss = dy.pickneglogsoftmax(scores, ref_word)
     # minibatch mode
     else:
       word_loss = dy.pickneglogsoftmax_batch(scores, ref_word)
-    if self.action_loss and is_terminal:
-      if is_stop:
-        word_loss = word_loss - dy.log(stop_prob) * self.action_loss_weight
-      else:
-        word_loss = word_loss - dy.log(1. - stop_prob) * self.action_loss_weight
-      #print is_stop, stop_prob.value()
-    if self.len_loss and is_terminal and leaf_len > 0:
-      if leaf_len > 20: leaf_len = 20
-      word_loss += dy.pickneglogsoftmax(len_scores, leaf_len-1) * self.len_loss_weight
     return word_loss
 
   def set_train(self, val):

@@ -52,7 +52,7 @@ defaults:
         #feed_word_emb: False
         #action_loss_weight: 0.9
         #len_loss_weight: 1.
-      #loop_trg: True
+      loop_trg: True
   decode:
     #sample_num: 2
     beam: 1

@@ -122,11 +122,12 @@ class GaussianNormalization(LengthNormalization, Serializable):
    Optionally, instead of fitting the average length, fit the length ratio len(trg)/len(src).
   '''
   yaml_tag = u'!GaussianNormalization'
-  def __init__(self, sent_stats,  apply_during_search=True, length_ratio=False, src_cond=True):
+  def __init__(self, sent_stats,  apply_during_search=True, length_ratio=False, src_cond=True, div=1.):
     self.sent_stats = sent_stats
     self.apply_during_search = apply_during_search
     self.length_ratio = length_ratio
     self.src_cond = src_cond
+    self.div = div
     self.fit_distribution()
 
   def fit_distribution(self):
@@ -142,6 +143,7 @@ class GaussianNormalization(LengthNormalization, Serializable):
           y[iter:iter_end] = t_len / float(key)
           iter = iter_end
       mu, std = norm.fit(y)
+      std = std / self.div
       self.distr = norm(mu, std)
     elif self.src_cond:
       stats = self.sent_stats.src_stat
@@ -160,6 +162,7 @@ class GaussianNormalization(LengthNormalization, Serializable):
           iter = iter_end
         mu, std = norm.fit(y)
         if std == 0: std += 5.
+        std = std / self.div
         self.distr[key] = norm(mu, std)
       for i in range(self.max_key-1, -1, -1):
         if i not in self.distr:

@@ -72,6 +72,7 @@ options = [
   Option("dropout", float, default_value=0.0),
   Option("weight_noise", float, default_value=0.0),
   Option("model", dict, default_value={}),
+  Option("rule_loss_weight", float, default_value=1.0),
 ]
 
 class XnmtTrainer(object):
@@ -250,6 +251,8 @@ class XnmtTrainer(object):
         eos_loss_builder = LossBuilder()
         rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count = standard_loss
 
+        rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
+
         loss_builder.add_loss("loss", rule_losses)
         loss_builder.add_loss("loss", word_losses)
         loss_builder.add_loss("loss", word_eos_losses)
@@ -404,6 +407,8 @@ class XnmtTrainer(object):
       dy.renew_cg()
       rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count \
         = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
+      rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
+
       word_loss_builder.add_loss("word_loss", word_losses)
       rule_loss_builder.add_loss("rule_loss", rule_losses)
       eos_loss_builder.add_loss("eos_loss", word_eos_losses)

@@ -122,10 +122,11 @@ class GaussianNormalization(LengthNormalization, Serializable):
    Optionally, instead of fitting the average length, fit the length ratio len(trg)/len(src).
   '''
   yaml_tag = u'!GaussianNormalization'
-  def __init__(self, sent_stats,  apply_during_search=True, length_ratio=True):
+  def __init__(self, sent_stats,  apply_during_search=True, length_ratio=False, src_cond=True):
     self.sent_stats = sent_stats
     self.apply_during_search = apply_during_search
     self.length_ratio = length_ratio
+    self.src_cond = src_cond
     self.fit_distribution()
 
   def fit_distribution(self):
@@ -142,6 +143,27 @@ class GaussianNormalization(LengthNormalization, Serializable):
           iter = iter_end
       mu, std = norm.fit(y)
       self.distr = norm(mu, std)
+    elif self.src_cond:
+      stats = self.sent_stats.src_stat
+      #num_sent = self.sent_stats.num_pair
+      #iter = 0
+      self.distr = {}
+      self.max_key = -1
+      for key in stats:
+        if key > self.max_key: self.max_key = key
+        num_trg = stats[key].num_sents
+        y = np.zeros(num_trg)
+        iter = 0
+        for t_len, count in stats[key].trg_len_distribution.items():
+          iter_end = count + iter
+          y[iter:iter_end] = t_len
+          iter = iter_end
+        mu, std = norm.fit(y)
+        if std == 0: std += 5.
+        self.distr[key] = norm(mu, std)
+      for i in range(self.max_key-1, -1, -1):
+        if i not in self.distr:
+          self.distr[i] = self.distr[i+1]
     else:
       stats = self.sent_stats.trg_stat
       num_sent = self.sent_stats.num_pair
@@ -156,14 +178,23 @@ class GaussianNormalization(LengthNormalization, Serializable):
 
   def trg_length_log_prob(self, src_length, trg_length):
     assert (src_length is not None), "Length of Source Sentence is required in GaussianNormalization when length_ratio=True"
+
     if self.length_ratio:
       return np.log(self.distr.pdf(trg_length/src_length))
+    elif self.src_cond:
+      if src_length in self.distr:
+        return np.log(self.distr[src_length].pdf(trg_length))
+      else:
+        return np.log(self.distr[self.max_key].pdf(trg_length))
     else:
       return np.log(self.distr.pdf(trg_length))
 
   def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
     if self.apply_during_search:
-      return score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len) - self.trg_length_log_prob(src_length, new_len-1)
+      score = score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len)
+      if new_len > 1:
+        score = score - self.trg_length_log_prob(src_length, new_len-1)
+      return score
     else:
       return score_so_far + score_to_add
 

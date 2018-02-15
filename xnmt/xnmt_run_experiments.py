@@ -130,7 +130,7 @@ def main(overwrite_args=None, dyparams=None):
     eval_scores = "Not evaluated"
     for i_epoch in six.moves.range(exp_args.run_for_epochs):
       if not exp_args.eval_only:
-        xnmt_trainer.run_epoch()
+        xnmt_trainer.run_epoch(i_epoch)
 
       if xnmt_trainer.early_stopping_reached:
         break

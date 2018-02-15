@@ -73,6 +73,7 @@ options = [
   Option("weight_noise", float, default_value=0.0),
   Option("model", dict, default_value={}),
   Option("rule_loss_weight", float, default_value=1.0),
+  Option("rule_weight_epoch", int, default_value=200)
 ]
 
 class XnmtTrainer(object):
@@ -221,7 +222,7 @@ class XnmtTrainer(object):
     else:
       print('new data set is not ready yet, using data from last epoch.')
 
-  def run_epoch(self, update_weights=True):
+  def run_epoch(self, i_epoch, update_weights=True):
     """
     :param update_weights: Whether to perform backward pass & update weights (useful for debugging)
     """
@@ -251,7 +252,8 @@ class XnmtTrainer(object):
         eos_loss_builder = LossBuilder()
         rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count = standard_loss
 
-        rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
+        if i_epoch <= self.args.rule_weight_epoch:
+          rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
 
         loss_builder.add_loss("loss", rule_losses)
         loss_builder.add_loss("loss", word_losses)
@@ -275,7 +277,7 @@ class XnmtTrainer(object):
                                       eos_loss_builder, rule_count, word_count, word_eos_count)
         self.logger.report_train_process()
         if self.logger.should_report_dev():
-          self.dev_evaluation()
+          self.dev_evaluation(i_epoch=i_epoch)
       else:
         #print(src)
         if standard_loss.__class__ == LossBuilder:
@@ -311,12 +313,12 @@ class XnmtTrainer(object):
 
     self.model.new_epoch()
 
-  def dev_evaluation(self, out_ext=".dev_hyp", ref_ext=".dev_ref", encoding='utf-8'):
+  def dev_evaluation(self, i_epoch=-1, out_ext=".dev_hyp", ref_ext=".dev_ref", encoding='utf-8'):
     self.model.set_train(False)
     self.logger.new_dev()
     if type(self.logger) == BatchTreeLossTracker:
       rule_count, word_count, word_eos_count, rule_losses, word_losses, word_eos_losses, loss_score \
-       = self.compute_dev_tree_loss()
+       = self.compute_dev_tree_loss(i_epoch)
       trg_words_cnt = word_count
     else:
       trg_words_cnt, loss_score = self.compute_dev_loss()
@@ -399,7 +401,7 @@ class XnmtTrainer(object):
     self.model.set_train(True)
     return
 
-  def compute_dev_tree_loss(self):
+  def compute_dev_tree_loss(self, i_epoch):
     word_loss_builder = LossBuilder()
     rule_loss_builder = LossBuilder()
     eos_loss_builder = LossBuilder()
@@ -409,7 +411,9 @@ class XnmtTrainer(object):
       dy.renew_cg()
       rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count \
         = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
-      rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
+
+      if i_epoch <= self.args.rule_weight_epoch:
+        rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
 
       word_loss_builder.add_loss("word_loss", word_losses)
       rule_loss_builder.add_loss("rule_loss", rule_losses)

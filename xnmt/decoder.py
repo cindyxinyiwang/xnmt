@@ -694,7 +694,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
                bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1, rule_cond=True,
-               update_ruleRNN=True):
+               update_ruleRNN=True, rule_label_smooth=-1):
 
     register_handler(self)
     self.set_word_lstm = True
@@ -702,6 +702,9 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     self.start_nonterm = start_nonterm
     self.feed_word_emb = feed_word_emb
     self.update_ruleRNN = update_ruleRNN
+    self.rule_label_smooth = rule_label_smooth
+    self.rule_size = vocab_size
+
     if action_loss_weight > 0:
       self.action_loss = True
       self.action_loss_weight = action_loss_weight
@@ -983,21 +986,24 @@ class TreeHierDecoder(RnnDecoder, Serializable):
       else:
         inp = dy.concatenate([tree_dec_state.rnn_state.output(), tree_dec_state.context])
       h_t = dy.tanh(self.rule_context_projector(inp))
-
+    if self.rule_label_smooth > 0:
+      proj = dy.cmult(self.rule_vocab_projector(h_t), dy.scalarInput(1. - self.rule_label_smooth)) \
+             + dy.scalarInput(self.rule_label_smooth / float(self.rule_size))
+    else:
+      proj = self.rule_vocab_projector(h_t)
     if label_idx >= 0:
       # training
-      return self.rule_vocab_projector(h_t), -1, None, None
+      return proj, -1, None, None
       #label = trg_rule_vocab.tag_vocab[label_idx]
       #valid_y_index = trg_rule_vocab.rule_index_with_lhs(label)
     else:
       valid_y_index = trg_rule_vocab.rule_index_with_lhs(tree_dec_state.open_nonterms[-1].label)
     if not valid_y_index:
       print 'warning: no rule with lhs: {}'.format(tree_dec_state.open_nonterms[-1].label)
-      #valid_y_index = [i for i in range(len(trg_rule_vocab))]
     valid_y_mask = np.ones((len(trg_rule_vocab),)) * (-1000)
     valid_y_mask[valid_y_index] = 0.
 
-    return self.rule_vocab_projector(h_t) + dy.inputTensor(valid_y_mask), len(valid_y_index), None, None
+    return proj + dy.inputTensor(valid_y_mask), len(valid_y_index), None, None
 
   def calc_loss(self, tree_dec_state, ref_action, trg_rule_vocab):
     ref_word = ref_action.get_col(0)

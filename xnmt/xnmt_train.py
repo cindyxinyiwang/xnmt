@@ -270,7 +270,9 @@ class XnmtTrainer(object):
           loss_value.backward()
           self.trainer.update()
 
-        self.logger.update_epoch_loss(src, trg, rule_loss_builder, word_loss_builder, eos_loss_builder, rule_count, word_count, word_eos_count)
+        self.logger.update_epoch_loss(src, trg, loss_builder,
+                                      rule_loss_builder, word_loss_builder,
+                                      eos_loss_builder, rule_count, word_count, word_eos_count)
         self.logger.report_train_process()
         if self.logger.should_report_dev():
           self.dev_evaluation()

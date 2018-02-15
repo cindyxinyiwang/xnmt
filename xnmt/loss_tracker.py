@@ -189,7 +189,7 @@ class BatchTreeLossTracker(LossTracker):
   A template class to track training process and generate report.
   """
 
-  REPORT_TEMPLATE           = 'Epoch %.4f: {}_word_loss/word=%.3f rule_loss/rule=%.3f eos_loss/eos=%.3f (words=%d, rules=%d, eos=%d, words/sec=%.2f, time=%s)'
+  REPORT_TEMPLATE           = 'Epoch %.4f: {} loss/word=%.3f word_loss/word=%.3f rule_loss/rule=%.3f eos_loss/eos=%.3f (words=%d, rules=%d, eos=%d, words/sec=%.2f, time=%s)'
   REPORT_TEMPLATE_DEV       = '  Epoch %.4f dev %s (words=%d, words/sec=%.2f, time=%s)'
   REPORT_TEMPLATE_DEV_AUX   = '  Epoch %.4f dev [auxiliary] %s'
   REPORT_TREE_TEMPLATE      = 'DEV: word_loss/word=%.3f rule_loss/rule=%.3f eos_loss/eos=%.3f (words=%d, rules=%d, eos=%d)'
@@ -230,6 +230,7 @@ class BatchTreeLossTracker(LossTracker):
     self.epoch_rule_loss = xnmt.loss.LossBuilder()
     self.epoch_word_loss = xnmt.loss.LossBuilder()
     self.epoch_eos_loss = xnmt.loss.LossBuilder()
+    self.epoch_loss = xnmt.loss.LossBuilder()
     self.epoch_words = 0
     self.epoch_rules = 0
     self.epoch_eos_words = 0
@@ -240,7 +241,7 @@ class BatchTreeLossTracker(LossTracker):
     self.sent_num_not_report_dev = 0
     self.last_report_words = 0
 
-  def update_epoch_loss(self, src, trg, rule_loss, word_loss, eos_loss,  rule_c, word_c, eos_c):
+  def update_epoch_loss(self, src, trg, loss, rule_loss, word_loss, eos_loss,  rule_c, word_c, eos_c):
     """
     Update epoch-wise counters for each iteration.
     """
@@ -250,6 +251,7 @@ class BatchTreeLossTracker(LossTracker):
     self.sent_num_not_report_train += batch_sent_num
     self.sent_num_not_report_dev += batch_sent_num
     #print rule_loss.compute().value()
+    self.epoch_loss += loss
     self.epoch_rule_loss += rule_loss
     self.epoch_word_loss += word_loss
     self.epoch_eos_loss += eos_loss
@@ -278,7 +280,9 @@ class BatchTreeLossTracker(LossTracker):
       this_report_time = time.time()
 
       print(BatchTreeLossTracker.REPORT_TEMPLATE.format('train') % (
-        self.fractional_epoch, self.epoch_word_loss.sum() / self.epoch_words,
+        self.fractional_epoch,
+        self.epoch_loss.sum() / self.epoch_words,
+        self.epoch_word_loss.sum() / self.epoch_words,
         self.epoch_rule_loss.sum() / self.epoch_rules,
         self.epoch_eos_loss.sum() / self.epoch_eos_words,
         self.epoch_words, self.epoch_rules, self.epoch_eos_words,

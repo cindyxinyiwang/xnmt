@@ -126,7 +126,8 @@ class DefaultTranslator(Translator, Serializable, Reportable):
         sent_stats.populate_statistics(train_src, train_trg)
         len_norm = GaussianNormalization(sent_stats,
                                             apply_during_search=len_norm_args.apply_during_search,
-                                            length_ratio=len_norm_args.length_ratio)
+                                            length_ratio=len_norm_args.length_ratio,
+                                            div=len_norm_args.div)
       else:
         len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
     search_args = {}
@@ -408,7 +409,6 @@ class TreeTranslator(Translator, Serializable, Reportable):
     return ret
 
   def initialize_generator(self, train_src, train_trg, **kwargs):
-
     if kwargs.get("len_norm_type", None) is None:
       len_norm = xnmt.length_normalization.NoNormalization()
     else:
@@ -424,7 +424,8 @@ class TreeTranslator(Translator, Serializable, Reportable):
         sent_stats.populate_statistics(train_src, train_trg)
         len_norm = GaussianNormalization(sent_stats,
                                             apply_during_search=len_norm_args.apply_during_search,
-                                            length_ratio=len_norm_args.length_ratio)
+                                            length_ratio=len_norm_args.length_ratio,
+                                            div=len_norm_args.div)
       else:
         len_norm = xnmt.serializer.YamlSerializer().initialize_object(kwargs["len_norm_type"])
     search_args = {}

@@ -98,10 +98,12 @@ class MultinomialNormalization(LengthNormalization, Serializable):
     return 0
 
   def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
+    score = score_so_far + score_to_add
     if self.apply_during_search:
-      return score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len) - self.trg_length_log_prob(src_length, new_len-1)
-    else:
-      return score_so_far + score_to_add
+      score += self.trg_length_log_prob(src_length, new_len)
+      if new_len > 1:
+        score = score - self.trg_length_log_prob(src_length, new_len-1)
+    return score
 
   def normalize_completed(self, completed_hyps, src_length=None):
     """
@@ -161,7 +163,7 @@ class GaussianNormalization(LengthNormalization, Serializable):
           y[iter:iter_end] = t_len
           iter = iter_end
         mu, std = norm.fit(y)
-        if std == 0: std += 5.
+        if std == 0: std = np.sqrt(key)
         std = std / self.div
         self.distr[key] = norm(mu, std)
       for i in range(self.max_key-1, -1, -1):
@@ -193,13 +195,12 @@ class GaussianNormalization(LengthNormalization, Serializable):
       return np.log(self.distr.pdf(trg_length))
 
   def normalize_partial(self, score_so_far, score_to_add, new_len, src_length=None):
+    score = score_so_far + score_to_add
     if self.apply_during_search:
-      score = score_so_far + score_to_add + self.trg_length_log_prob(src_length, new_len)
+      score += self.trg_length_log_prob(src_length, new_len)
       if new_len > 1:
-        score = score - self.trg_length_log_prob(src_length, new_len-1)
-      return score
-    else:
-      return score_so_far + score_to_add
+        score -= self.trg_length_log_prob(src_length, new_len-1)
+    return score
 
   def normalize_completed(self, completed_hyps, src_length=None):
     """

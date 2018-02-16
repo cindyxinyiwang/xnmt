@@ -27,7 +27,8 @@ options = [
   Option("ref_file", str, required=False, help_str="path of file with reference translations, e.g. for forced decoding"),
   Option("max_src_len", int, required=False, help_str="Remove sentences from data to decode that are longer than this on the source side"),
   Option("input_format", default_value="text", help_str="format of input data: text/contvec"),
-  Option("post_process", default_value="none", help_str="post-processing of translation outputs: none/join-char/join-bpe/rule-piece/rule"),
+  Option("post_process", default_value="none", help_str="post-processing of translation outputs: none/join-char/join-bpe/rule-piece/rule/ccg-piece"),
+  Option("tag_file", default_value="none", help_str="tag file for ccg-piece"),
   Option("candidate_id_file", required=False, default_value=None, help_str="if we are doing something like retrieval where we select from fixed candidates, sometimes we want to limit our candidates to a certain subset of the full set. this setting allows us to do this."),
   Option("report_path", str, required=False, help_str="a path to which decoding reports will be written"),
   Option("report_type", str, default_value="html", required=False, help_str="report to generate file/html. Can be multiple, separate with comma."),
@@ -85,7 +86,7 @@ def xnmt_decode(args, model_elements=None, train_src=None, train_trg=None):
   # TODO: Structure it better. not only Translator can have post processes
   if issubclass(generator.__class__, Translator):
 
-    generator.set_post_processor(output_processor_for_spec(args.post_process),
+    generator.set_post_processor(output_processor_for_spec(args.post_process, tag_file=args.tag_file),
                                  sampling=sampling,
                                  output_beam=args.output_beam)
     generator.set_trg_vocab(trg_vocab)
@@ -132,7 +133,7 @@ def xnmt_decode(args, model_elements=None, train_src=None, train_trg=None):
   if rule_decode:
     trg_parse.close()
 
-def output_processor_for_spec(spec):
+def output_processor_for_spec(spec, tag_file=None):
   if spec == "none":
     return PlainTextOutputProcessor()
   elif spec == "join-char":
@@ -149,6 +150,13 @@ def output_processor_for_spec(spec):
     return RuleOutputProcessor(piece=True, wordswitch=True)
   elif spec == "rule":
     return RuleOutputProcessor(piece=False, wordswitch=False)
+  elif spec == "ccg-piece":
+    assert tag_file
+    tags = set()
+    with codecs.open(tag_file, 'r', encoding="utf-8") as myfile:
+      for line in myfile:
+        tags.add(line.strip())
+    return CcgPieceOutputProcessor(tag_set=tags)
   else:
     raise RuntimeError("Unknown postprocessing argument {}".format(spec))
 

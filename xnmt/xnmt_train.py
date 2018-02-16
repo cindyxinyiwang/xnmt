@@ -335,7 +335,7 @@ class XnmtTrainer(object):
       # Decoding + post_processing
       xnmt.xnmt_decode.xnmt_decode(self.decode_args, model_elements=(self.corpus_parser, self.model),
                                    train_src=self.training_corpus.train_src_data, train_trg=self.training_corpus.train_trg_data)
-      output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process)
+      output_processor = xnmt.xnmt_decode.output_processor_for_spec(self.decode_args.post_process, self.decode_args.tag_file)
       # Copy Trg to Ref
       processed = []
       if self.training_corpus.dev_ref_file:

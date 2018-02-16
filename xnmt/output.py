@@ -19,8 +19,11 @@ class TextOutput(Output):
     self.vocab = vocab
     self.filtered_tokens = set([Vocab.SS, Vocab.ES])
 
-  def to_string(self):
-    return six.moves.map(lambda wi: self.vocab[wi], filter(lambda wi: wi not in self.filtered_tokens, self.actions))
+  def to_string(self, tag_set=None):
+    ret = six.moves.map(lambda wi: self.vocab[wi], filter(lambda wi: wi not in self.filtered_tokens, self.actions))
+    if tag_set:
+      ret = [w for w in ret if w not in tag_set]
+    return ret
 
 class TreeHierOutput(Output):
   def __init__(self, actions=None, rule_vocab=None, word_vocab=None):
@@ -52,6 +55,27 @@ class PlainTextOutputProcessor(OutputProcessor):
 
   def words_to_string(self, word_list):
     return u" ".join(word_list)
+
+class CcgPieceOutputProcessor(OutputProcessor):
+  '''
+  Handles the typical case of writing plain text,
+  with one sent per line.
+  '''
+  def __init__(self, tag_set, merge_indicator=u"\u2581"):
+    self.filtered_tokens = set([Vocab.SS, Vocab.ES])
+    self.tag_set = tag_set
+    self.merge_indicator = merge_indicator
+
+  def to_string(self):
+    words = six.moves.map(lambda wi: self.vocab[wi], filter(lambda wi: wi not in self.filtered_tokens, self.actions))
+    words = [w for w in words if w not in self.tag_set]
+    return words
+
+  def process_outputs(self, outputs):
+    return [self.words_to_string(output.to_string(self.tag_set)) for output in outputs]
+
+  def words_to_string(self, word_list):
+    return u"".join(word_list).replace(self.merge_indicator, u" ").strip()
 
 class RuleOutputProcessor(PlainTextOutputProcessor):
   def __init__(self, piece=True, wordswitch=False):

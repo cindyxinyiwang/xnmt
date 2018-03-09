@@ -526,6 +526,7 @@ class TreeTranslator(Translator, Serializable, Reportable):
                                                       dec_state, src_length=len(sents),
                                                       forced_trg_ids=forced_trg_ids,
                                                       trg_rule_vocab=trg_rule_vocab,
+                                                      word_vocab=word_vocab,
                                                       tag_embedder=self.tag_embedder,
                                                       word_attender=self.word_attender,
                                                       word_embedder=self.word_embedder)
@@ -548,6 +549,7 @@ class TreeTranslator(Translator, Serializable, Reportable):
                                                                      trg_rule_vocab=trg_rule_vocab,
                                                                      word_attender=self.word_attender,
                                                                      word_embedder=self.word_embedder,
+                                                                     word_vocab=word_vocab,
                                                                      output_beam=self.output_beam)
 
       # Append output to the outputs

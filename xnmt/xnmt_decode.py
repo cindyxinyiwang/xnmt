@@ -146,6 +146,8 @@ def output_processor_for_spec(spec, tag_file=None):
     return RuleOutputProcessor(piece=True, wordswitch=True)
   elif spec == "rule-piece":
     return RuleOutputProcessor(piece=True, wordswitch=False)
+  elif spec == "rule-bpe":
+    return RuleBPEOutputProcessor(wordswitch=False)
   elif spec == "rule-wordswitch":
     return RuleOutputProcessor(piece=True, wordswitch=True)
   elif spec == "rule":

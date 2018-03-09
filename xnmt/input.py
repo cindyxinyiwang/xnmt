@@ -399,7 +399,7 @@ class TreeReader(BaseTextReader, Serializable):
     yaml_tag = u'!TreeReader'
 
     def __init__(self, vocab=None, word_vocab=None, binarize=True, del_preterm_POS=False,
-                 read_word=False, merge=False, merge_level=-1, add_eos=True):
+                 read_word=False, merge=False, merge_level=-1, add_eos=True, replace_pos=False, bpe_post=False):
         self.vocab = vocab
         self.binarize = binarize
         self.del_preterm_POS = del_preterm_POS
@@ -408,6 +408,8 @@ class TreeReader(BaseTextReader, Serializable):
         self.merge = merge
         self.merge_level = merge_level
         self.add_eos = add_eos
+        self.replace_pos = replace_pos
+        self.bpe_post = bpe_post
         if vocab is not None:
             self.vocab.freeze()
             self.vocab.set_unk(Vocab.UNK_STR)
@@ -424,9 +426,16 @@ class TreeReader(BaseTextReader, Serializable):
         if len(filename) > 1:
             for line, sent_piece in self.iterate_filtered_double(filename[0], filename[1], filter_ids):
                 tree = Tree(parse_root(tokenize(line)))
-                if self.del_preterm_POS:
-                    remove_preterminal_POS(tree.root)
-                split_sent_piece(tree.root, sent_piece_segs(sent_piece), 0)
+                if self.replace_pos:
+                    replace_POS(tree.root)
+                else:
+                    if self.del_preterm_POS:
+                        remove_preterminal_POS(tree.root)
+                if self.bpe_post:
+                    pieces = sent_piece_segs_bpe(sent_piece)
+                else:
+                    pieces = sent_piece_segs(sent_piece)
+                split_sent_piece(tree.root, pieces, 0)
                 if self.merge:
                     merge_tags(tree.root)
                 if self.merge_level > 0:
@@ -902,6 +911,42 @@ def sent_piece_segs(p):
         ret.append(p[p_start:])
     return ret
 
+def sent_piece_segs_bpe(p):
+    '''
+  Segment a sentence piece string into list of piece string for each word
+  '''
+    # print p
+    # print p.split()
+    # toks = re.compile(ur'\xe2\x96\x81[^(\xe2\x96\x81)]+')
+    toks = p.split()
+    ret = []
+    cur = []
+    for t in toks:
+        cur.append(t)
+        if not t.endswith(u'@@'):
+            ret.append(u' '.join(cur))
+            cur = []
+    return ret
+
+def sent_piece_segs_post(p):
+    '''
+  Segment a sentence piece string into list of piece string for each word
+  '''
+    # print p
+    # print p.split()
+    # toks = re.compile(ur'\xe2\x96\x81[^(\xe2\x96\x81)]+')
+    toks = re.compile(ur'\u2581')
+    ret = []
+    p_start = 0
+    for m in toks.finditer(p):
+        pos = m.start()
+        if pos == 0:
+            continue
+        ret.append(p[p_start:pos+1].strip())
+        p_start = pos+1
+    if p_start != len(p) - 1:
+        ret.append(p[p_start:])
+    return ret
 
 def split_sent_piece(root, piece_l, word_idx):
     '''
@@ -1191,10 +1236,10 @@ if __name__ == "__main__":
     '''
 
 
-    train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.parse.eng"
-    train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.piece.eng"
-    #train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowparse.en"
-    #train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-train.lowpiece.en"
+    #train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.parse.eng"
+    #train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/orm_data/set0-test.tok.piece.eng"
+    train_parse = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-test.lowparse.en"
+    train_piece = "/Users/cindywang/Documents/research/TSG/xnmt/kftt_data/tok/kyoto-test.lowpiece.en"
     parse_fp = codecs.open(train_parse, 'r', encoding='utf-8')
     piece_fp = codecs.open(train_piece, 'r', encoding='utf-8')
     rule_vocab = RuleVocab()
@@ -1209,7 +1254,7 @@ if __name__ == "__main__":
         split_sent_piece(t.root, sent_piece_segs(piece), 0)
         #merge_depth(t.root, 5, 0)
         #merge_tags(t.root)
-        #add_preterminal_wordswitch(t.root, add_eos=False)
+        add_preterminal_wordswitch(t.root, add_eos=False)
         #t.reset_timestep()
         #t.root.get_leaf_lens(leaf_lens)
         #t.get_data_root(rule_vocab)

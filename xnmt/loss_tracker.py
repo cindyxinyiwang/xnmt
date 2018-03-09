@@ -278,13 +278,16 @@ class BatchTreeLossTracker(LossTracker):
       self.sent_num_not_report_train = self.sent_num_not_report_train % self.eval_train_every
       self.fractional_epoch = (self.epoch_num - 1) + self.sent_num / self.total_train_sent
       this_report_time = time.time()
-
+      if self.epoch_eos_words == 0:
+        eos_loss = 0.
+      else:
+        eos_loss = self.epoch_eos_loss.sum() / self.epoch_eos_words
       print(BatchTreeLossTracker.REPORT_TEMPLATE.format('train') % (
         self.fractional_epoch,
         self.epoch_loss.sum() / self.epoch_words,
         self.epoch_word_loss.sum() / self.epoch_words,
         self.epoch_rule_loss.sum() / self.epoch_rules,
-        self.epoch_eos_loss.sum() / self.epoch_eos_words,
+        eos_loss,
         self.epoch_words, self.epoch_rules, self.epoch_eos_words,
         (self.epoch_words - self.last_report_words) / (this_report_time - self.last_report_train_time),
         self.format_time(time.time() - self.start_time)))

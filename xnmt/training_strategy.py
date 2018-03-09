@@ -133,7 +133,11 @@ class TrainingTreeLoss(Serializable):
           dec_state = translator.decoder.add_input(dec_state, translator.trg_embedder.embed(word),
                                                    ref_word,
                                                    trg_rule_vocab=trg_rule_vocab)
-    return dy.esum(rule_losses), dy.esum(word_losses), dy.esum(word_eos_losses), rule_count, word_count, word_eos_count
+    if word_eos_losses:
+      eos_loss = dy.esum(word_eos_losses)
+    else:
+      eos_loss = dy.inputTensor([0.])
+    return dy.esum(rule_losses), dy.esum(word_losses), eos_loss, rule_count, word_count, word_eos_count
 
 class TrainingReinforceLoss(Serializable):
   yaml_tag = '!TrainingReinforceLoss'

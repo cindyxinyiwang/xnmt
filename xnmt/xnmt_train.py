@@ -410,7 +410,8 @@ class XnmtTrainer(object):
     for i in range(len(self.dev_src)):
       dy.renew_cg()
       rule_losses, word_losses, word_eos_losses, rule_count, word_count, word_eos_count \
-        = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab)
+        = self.model.calc_loss(self.dev_src[i], self.dev_trg[i], self.corpus_parser.trg_reader.vocab, \
+                               self.corpus_parser.trg_reader.word_vocab)
 
       if i_epoch <= self.args.rule_weight_epoch:
         rule_losses = dy.cmult(rule_losses, dy.scalarInput(self.args.rule_loss_weight))
@@ -431,7 +432,11 @@ class XnmtTrainer(object):
       word_loss_value = word_loss_builder.compute()
       rule_loss_value = rule_loss_builder.compute()
       eos_loss_value = eos_loss_builder.compute()
-    return rule_cnt, word_cnt, eos_cnt, rule_loss_builder.sum() / rule_cnt, word_loss_builder.sum() / word_cnt, eos_loss_builder.sum() / eos_cnt, LossScore(loss_builder.sum() / word_cnt)
+      if eos_cnt == 0:
+        eos_loss = 0.
+      else:
+        eos_loss = eos_loss_builder.sum() / eos_cnt
+    return rule_cnt, word_cnt, eos_cnt, rule_loss_builder.sum() / rule_cnt, word_loss_builder.sum() / word_cnt, eos_loss, LossScore(loss_builder.sum() / word_cnt)
 
   def compute_dev_loss(self):
     loss_builder = LossBuilder()

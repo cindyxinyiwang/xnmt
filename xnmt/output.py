@@ -86,6 +86,16 @@ class RuleOutputProcessor(PlainTextOutputProcessor):
     tree = Tree.from_rule_deriv(rule_list, wordswitch=self.wordswitch)
     return [tree.to_string(self.piece), tree.to_parse_string()]
 
+class RuleBPEOutputProcessor(PlainTextOutputProcessor):
+  def __init__(self, wordswitch=False):
+    self.wordswitch = wordswitch
+
+  def words_to_string(self, rule_list):
+    tree = Tree.from_rule_deriv(rule_list, wordswitch=self.wordswitch)
+    str = tree.to_string(piece=False)
+
+    return [str.replace(u"@@ ", u""), tree.to_parse_string()]
+
 class JoinedCharTextOutputProcessor(PlainTextOutputProcessor):
   '''
   Assumes a single-character vocabulary and joins them to form words;

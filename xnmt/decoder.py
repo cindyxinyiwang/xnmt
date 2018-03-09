@@ -143,7 +143,7 @@ class OpenNonterm:
     self.is_sibling = is_sibling
     self.sib_state = sib_state
 
-class TreeDecoderState:
+class TreeDecoderStateExp:
   """A state holding all the information needed for MLPSoftmaxDecoder"""
   def __init__(self, rnn_state=None, word_rnn_state=None, context=None, word_context=None,
                states=[], tree=None, open_nonterms=[], prev_word_state=None, stop_action=False, leaf_len=-1, step_len=-1):
@@ -166,7 +166,7 @@ class TreeDecoderState:
     open_nonterms_copy = []
     for n in self.open_nonterms:
       open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state, n.is_sibling, n.sib_state))
-    return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
+    return TreeDecoderStateExp(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
                             open_nonterms=open_nonterms_copy, prev_word_state=self.prev_word_state, stop_action=self.stop_action,
                             leaf_len=self.leaf_len, step_len=self.step_len)
 
@@ -818,12 +818,12 @@ class TreeHierDecoderExp(RnnDecoder, Serializable):
     self.decoding = decoding
     if decoding:
       zeros_lstm = dy.zeros(self.lstm_dim)
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
+      return TreeDecoderStateExp(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
           open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
           prev_word_state=zeros_lstm)
     else:
       batch_size = ss_expr.dim()[1]
-      return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \
+      return TreeDecoderStateExp(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \
           states=np.array([dy.zeros((self.lstm_dim,), batch_size=batch_size)]))
 
   def add_input(self, tree_dec_state, trg, word_embedder, rule_embedder,
@@ -890,7 +890,7 @@ class TreeHierDecoderExp(RnnDecoder, Serializable):
           if word_idx[0] == Vocab.ES:
             states = np.append(states, rnn_state.output())
 
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
+      return TreeDecoderStateExp(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
     else:
       #print trg
@@ -956,7 +956,7 @@ class TreeHierDecoderExp(RnnDecoder, Serializable):
 
         #word_rnn_state = word_rnn_state.add_input(dy.concatenate([dy.zeros(self.word_lstm_input - self.lstm_dim),
         #                                                          rnn_state.output()]))
-      return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
+      return TreeDecoderStateExp(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
                               open_nonterms=open_nonterms, prev_word_state=prev_word_state, leaf_len=leaf_len, step_len=step_len)
 
   def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1, sample_len=False):
@@ -1034,33 +1034,52 @@ class TreeHierDecoderExp(RnnDecoder, Serializable):
     if self.set_word_lstm:
       self.word_lstm.set_dropout(self.dropout if val else 0.0)
 
+class TreeDecoderState:
+  """A state holding all the information needed for MLPSoftmaxDecoder"""
+  def __init__(self, rnn_state=None, word_rnn_state=None, context=None, word_context=None,
+               states=[], tree=None, open_nonterms=[], stop_action=False):
+    self.rnn_state = rnn_state
+    self.context = context
+    self.word_rnn_state = word_rnn_state
+    self.word_context = word_context
+    # training time
+    self.states = states
+    self.tree = tree
+
+    # decoding time
+    self.open_nonterms = open_nonterms
+    self.stop_action = stop_action
+
+  def copy(self):
+    open_nonterms_copy = []
+    for n in self.open_nonterms:
+      open_nonterms_copy.append(OpenNonterm(n.label, n.parent_state, n.is_sibling, n.sib_state))
+    return TreeDecoderState(rnn_state=self.rnn_state, word_rnn_state=self.word_rnn_state, context=self.context, word_context=self.word_context,
+                            open_nonterms=open_nonterms_copy, stop_action=self.stop_action)
+
 class TreeHierDecoder(RnnDecoder, Serializable):
   # TreeHierDecoder final version
-
   yaml_tag = u'!TreeHierDecoder'
 
 
   def __init__(self, yaml_context, vocab_size, word_vocab_size, layers=1, input_dim=None, lstm_dim=None,
-               mlp_hidden_dim=None, trg_embed_dim=None, tag_embed_dim=None, dropout=None,
+               mlp_hidden_dim=None, trg_embed_dim=None, dropout=None,
                rnn_spec="lstm", residual_to_output=False, input_feeding=True,
-               bridge=None, start_nonterm='ROOT', feed_word_emb=False, action_loss_weight=-1, len_loss_weight=-1, rule_cond=True,
-               update_ruleRNN=True, rule_label_smooth=-1):
+               bridge=None, start_nonterm='ROOT', bpe_stop=False):
 
     register_handler(self)
-    self.set_word_lstm = True
     param_col = yaml_context.dynet_param_collection.param_col
+    # best setups
+    self.set_word_lstm = True
     self.start_nonterm = start_nonterm
-    self.feed_word_emb = False
-    self.update_ruleRNN = True
     self.rule_label_smooth = -1
     self.rule_size = vocab_size
-    self.action_loss = False
-    self.len_loss = False
+
+    self.bpe_stop = bpe_stop
     # Define dim
     lstm_dim       = lstm_dim or yaml_context.default_layer_dim
     mlp_hidden_dim = mlp_hidden_dim or yaml_context.default_layer_dim
     trg_embed_dim  = trg_embed_dim or yaml_context.default_layer_dim
-    tag_embed_dim = tag_embed_dim or yaml_context.default_layer_dim
     input_dim      = input_dim or yaml_context.default_layer_dim
     self.input_dim = input_dim
     # Input feeding
@@ -1099,8 +1118,6 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                               model = param_col,
                                               residual_to_output = residual_to_output)
     # MLP
-    self.rule_cond = True
-
     self.rule_context_projector = xnmt.linear.Linear(input_dim=2*input_dim + 2*lstm_dim,
                                                 output_dim=mlp_hidden_dim,
                                                 model=param_col)
@@ -1113,7 +1130,6 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     self.word_vocab_projector = xnmt.linear.Linear(input_dim = mlp_hidden_dim,
                                          output_dim = word_vocab_size,
                                          model = param_col)
-
     # Dropout
     self.dropout = dropout or yaml_context.dropout
 
@@ -1143,8 +1159,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
     if decoding:
       zeros_lstm = dy.zeros(self.lstm_dim)
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn,  \
-          open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)], \
-          prev_word_state=zeros_lstm)
+          open_nonterms=[OpenNonterm(self.start_nonterm, parent_state=zeros_lstm, sib_state=zeros_lstm)])
     else:
       batch_size = ss_expr.dim()[1]
       return TreeDecoderState(rnn_state=rnn_state, context=zeros_rnn, word_rnn_state=word_rnn_state, word_context=zeros_word_rnn, \
@@ -1177,8 +1192,7 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         if self.input_feeding:
           inp = dy.concatenate([inp, tree_dec_state.context])
         inp = dy.concatenate([inp, paren_tm1_state, word_rnn_state.output()])
-        if self.feed_word_emb:
-          inp = dy.concatenate([inp, word_embedder.embed(Vocab.ES)])
+
         rnn_state = rnn_state.add_input(inp)
         states = np.append(states, rnn_state.output())
       else:
@@ -1195,14 +1209,19 @@ class TreeHierDecoder(RnnDecoder, Serializable):
                                   word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
         # if this is end of phrase append states list
-        if word_idx[0] == Vocab.ES:
-          states = np.append(states, rnn_state.output())
+        if self.bpe_stop:
+          word = word_vocab[word_idx[0]]
+          if not word.endswith('@@'):
+            states = np.append(states, rnn_state.output())
+        else:
+          if word_idx[0] == Vocab.ES:
+            states = np.append(states, rnn_state.output())
 
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context, \
                            states=states)
     else:
       open_nonterms = tree_dec_state.open_nonterms[:]
-      prev_word_state = tree_dec_state.prev_word_state
+      stop_action = tree_dec_state.stop_action
       if open_nonterms[-1].label == u'*':
         inp = word_embedder.embed(trg)
         if self.input_feeding:
@@ -1212,8 +1231,15 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         rnn_inp = dy.concatenate([dy.zeros(self.rule_lstm_input - self.lstm_dim),
                                  word_rnn_state.output()])
         rnn_state = rnn_state.add_input(rnn_inp)
-        if trg == Vocab.ES:
-          open_nonterms.pop()
+        if self.bpe_stop:
+          word = word_vocab[trg]
+          #if word.endswith(u'\u2581'):
+          if not word.endswith('@@'):
+            open_nonterms.pop()
+            stop_action = True
+        else:
+          if trg == Vocab.ES:
+            open_nonterms.pop()
       else:
         inp = rule_embedder.embed(trg)
         if self.input_feeding:
@@ -1232,12 +1258,10 @@ class TreeHierDecoder(RnnDecoder, Serializable):
         for rhs in rule.rhs:
           if rhs in rule.open_nonterms:
             new_open_nonterms.append(OpenNonterm(rhs, parent_state=rnn_state.output()))
-          else:
-            prev_word_state = rnn_state.output()
         new_open_nonterms.reverse()
         open_nonterms.extend(new_open_nonterms)
       return TreeDecoderState(rnn_state=rnn_state, context=tree_dec_state.context, word_rnn_state=word_rnn_state, word_context=tree_dec_state.word_context,\
-                              open_nonterms=open_nonterms, prev_word_state=prev_word_state)
+                              open_nonterms=open_nonterms, stop_action=stop_action)
 
   def get_scores(self, tree_dec_state, trg_rule_vocab, is_terminal, label_idx=-1, sample_len=False):
     """Get scores given a current state.
